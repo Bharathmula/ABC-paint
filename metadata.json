@@ -1,0 +1,6 @@
+{
+  "name": "ABC Paints - Orders & Inventory Dashboard",
+  "description": "ABC Paints enterprise orders and inventory management dashboard featuring stock records with safety limits, reorder decisions with Excel export, and an urgent deadline delivery tracker.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
