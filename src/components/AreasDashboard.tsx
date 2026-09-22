@@ -13,7 +13,14 @@ export function AreasDashboard({orders}:{orders:Order[]}){
  const [search,setSearch]=useState(''); const [selected,setSelected]=useState<string[]>([]);
  const [code,setCode]=useState(''); const [company,setCompany]=useState(''); const [cls,setCls]=useState<AreaClass>('Local');
  const [message,setMessage]=useState(''); const fileRef=useRef<HTMLInputElement>(null);
- useEffect(()=>{loadDbAreas().then((rows)=>{if(Array.isArray(rows)){setAreas(rows);saveAreas(rows)}}).catch(()=>{})},[]);
+ useEffect(()=>{
+  const bundled=loadAreas();
+  loadDbAreas().then(async(rows)=>{
+   if(Array.isArray(rows)&&rows.length>0){setAreas(rows);saveAreas(rows);return}
+   setAreas(bundled);saveAreas(bundled);
+   try{await saveDbAreas(bundled,'Initial 3-Year Analysis area data')}catch{}
+  }).catch(()=>{setAreas(bundled)});
+ },[]);
  const persist=async(next:AreaEntry[],source='Manual area update')=>{setAreas(next);saveAreas(next);try{await saveDbAreas(next,source);setMessage(`${message||'Areas updated'} Saved permanently in PostgreSQL.`)}catch{setMessage(`${message||'Areas updated'} Database unavailable; saved in this browser.`)}};
  const stats=useMemo(()=>{const m=new Map<string,{n:number;q:number}>();orders.filter(o=>o.pending>0).forEach(o=>{const k=o.companyName.trim().toUpperCase();const x=m.get(k)||{n:0,q:0};x.n++;x.q+=o.pending;m.set(k,x)});return m},[orders]);
  const filtered=useMemo(()=>{const q=search.toLowerCase().trim();return areas.filter(a=>!q||a.areaCode.toLowerCase().includes(q)||a.companyName.toLowerCase().includes(q)||a.classification.toLowerCase().includes(q))},[areas,search]);
@@ -33,3 +40,4 @@ export function AreasDashboard({orders}:{orders:Order[]}){
   <button disabled={!selected.length} onClick={remove} className="bg-red-600 text-white rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 inline-flex items-center gap-1"><Trash2 className="w-4 h-4"/>Remove Selected</button>
  </div>
 }
+
