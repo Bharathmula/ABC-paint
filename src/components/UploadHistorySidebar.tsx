@@ -15,7 +15,7 @@ export function UploadHistorySidebar(){
   try{await deleteImportHistory(selected);setRows(r=>r.filter(x=>!selected.includes(String(x.id))));setSelected([]);setMessage('Selected history deleted.')}catch{setMessage('Could not delete history. Check the database connection.')}
  };
  return <>
-  <button type="button" onClick={()=>setOpen(v=>!v)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-slate-900 text-white rounded-r-2xl px-5 py-4 min-w-40 shadow-xl flex items-center justify-center gap-3 text-base font-bold" title={open?'Close upload history':'Open upload history'}><History className="w-6 h-6"/><span>History</span>{open?<ChevronLeft className="w-5 h-5"/>:<ChevronRight className="w-5 h-5"/>}</button>
+  <button type="button" onClick={()=>setOpen(v=>!v)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-slate-900 text-white rounded-r-xl px-2 py-4 shadow-lg flex flex-col items-center gap-1" title={open?'Close upload history':'Open upload history'}><History className="w-4 h-4"/><span className="text-[10px] [writing-mode:vertical-rl]">History</span>{open?<ChevronLeft className="w-3 h-3"/>:<ChevronRight className="w-3 h-3"/>}</button>
   <aside className={`fixed left-0 top-0 bottom-0 z-40 w-96 max-w-[92vw] bg-white border-r shadow-2xl transition-transform duration-200 ${open?'translate-x-0':'-translate-x-full'}`}>
    <div className="h-full flex flex-col pt-20">
     <div className="px-5 pb-4 border-b"><h2 className="font-bold text-lg flex items-center gap-2"><History className="w-6 h-6"/>Upload History</h2><p className="text-xs text-slate-500 mt-1">Select upload records and delete them when they are no longer required.</p></div>
