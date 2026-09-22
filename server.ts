@@ -112,6 +112,14 @@ app.get('/api/import-history', async (_req,res) => {
   res.json(q.rows);
 });
 
+app.delete('/api/import-history', async (req,res) => {
+  if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
+  const ids=(Array.isArray(req.body?.ids)?req.body.ids:[]).map(String).filter((id:string)=>/^\d+$/.test(id));
+  if (!ids.length) return res.status(400).json({error:'Select at least one history record'});
+  const q=await pool.query('DELETE FROM import_history WHERE id = ANY($1::bigint[]) RETURNING id',[ids]);
+  res.json({ok:true,deleted:q.rowCount});
+});
+
 app.post('/api/orders/import', async (req,res) => {
   if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
   const {orders=[], sourceFile='Excel Upload', mode='merge'} = req.body || {};
