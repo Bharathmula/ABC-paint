@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -9,12 +10,16 @@ ROOT = Path(__file__).parent
 DIST = ROOT / "dist"
 
 def dashboard_html():
-    css_files = list((DIST / "assets").glob("*.css"))
-    js_files = list((DIST / "assets").glob("*.js"))
-    if not css_files or not js_files:
+    index_path = DIST / "index.html"
+    if not index_path.exists():
         return ""
-    css = max(css_files, key=lambda p: p.stat().st_mtime).read_text(encoding="utf-8")
-    js = max(js_files, key=lambda p: p.stat().st_mtime).read_text(encoding="utf-8").replace("</script>", "<\\/script>")
+    index = index_path.read_text(encoding="utf-8")
+    css_match = re.search(r'href="/assets/([^"]+\.css)"', index)
+    js_match = re.search(r'src="/assets/([^"]+\.js)"', index)
+    if not css_match or not js_match:
+        return ""
+    css = (DIST / "assets" / css_match.group(1)).read_text(encoding="utf-8")
+    js = (DIST / "assets" / js_match.group(1)).read_text(encoding="utf-8").replace("</script>", "<\\/script>")
     return f"""<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>{css}</style></head><body><div id="root"></div><script type="module">{js}</script></body></html>"""
 
 html = dashboard_html()

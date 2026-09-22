@@ -1,3 +1,5 @@
+import customerMaster from '../data/customerMaster.json';
+
 export type AreaClass = 'Local' | 'Transport' | '';
 export type AreaEntry = { id:string; code?:string; areaCode:string; companyName:string; classification:AreaClass; custom?:boolean };
 export type DeletedArea = { trashId:string; deletedAt:string; entry:AreaEntry };
@@ -15,14 +17,22 @@ export function resolveAreaCode(companyName:string, providedArea?:string):string
 }
 
 export function defaultAreas(): AreaEntry[] {
-  return [];
+  return (customerMaster as Array<{code:string;partyName:string;areaCode:string}>).map((c,i)=>({
+    id:`db-${c.code||i}`,
+    code:c.code,
+    areaCode:normalize(c.areaCode),
+    companyName:normalize(c.partyName),
+    classification:'' as AreaClass,
+  })).filter(a=>!!a.companyName);
 }
 export function loadAreas():AreaEntry[]{
+  const defaults=defaultAreas();
   try {
     const x=JSON.parse(localStorage.getItem(AREA_KEY)||'[]');
-    if(Array.isArray(x)) return x;
+    if(Array.isArray(x) && x.length>0) return x;
   } catch{}
-  return [];
+  localStorage.setItem(AREA_KEY,JSON.stringify(defaults));
+  return defaults;
 }
 export function saveAreas(v:AreaEntry[]){ localStorage.setItem(AREA_KEY,JSON.stringify(v)); window.dispatchEvent(new Event('abc-areas-changed')); }
 export function loadRecycleBin():DeletedArea[]{ try{const x=JSON.parse(localStorage.getItem(TRASH_KEY)||'[]'); return Array.isArray(x)?x:[];}catch{return [];} }
