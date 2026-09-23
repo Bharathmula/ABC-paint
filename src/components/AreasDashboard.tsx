@@ -7,6 +7,7 @@ import {loadDbAreas,saveDbAreas} from '../utils/api';
 
 const clean=(v:any)=>String(v??'').trim();
 const header=(v:any)=>clean(v).toLowerCase().replace(/[^a-z]/g,'');
+const SHARED_AREA_MIGRATION_KEY='abc_shared_areas_migrated_v1';
 
 export function AreasDashboard({orders}:{orders:Order[]}){
  const [areas,setAreas]=useState<AreaEntry[]>(()=>loadAreas());
@@ -18,7 +19,18 @@ export function AreasDashboard({orders}:{orders:Order[]}){
   const bundled=loadAreas();
   const refresh=()=>loadDbAreas().then(async(rows)=>{
    if(!active)return;
-   if(Array.isArray(rows)&&rows.length>0){setAreas(rows);saveAreas(rows);return}
+   if(Array.isArray(rows)&&rows.length>0){
+    let sharedRows=rows;
+    const shouldMigrate=localStorage.getItem(SHARED_AREA_MIGRATION_KEY)!=='true';
+    const classified=bundled.filter(a=>a.classification==='Local'||a.classification==='Transport');
+    if(shouldMigrate&&classified.length){
+     const localByCode=new Map(classified.map(a=>[clean(a.code||a.id).replace(/^db-/,''),a]));
+     const localByParty=new Map(classified.map(a=>[`${clean(a.companyName).toUpperCase()}|${clean(a.areaCode).toUpperCase()}`,a]));
+     sharedRows=rows.map((row:AreaEntry)=>{const code=clean(row.code||row.id).replace(/^db-/,'');const local=localByCode.get(code)||localByParty.get(`${clean(row.companyName).toUpperCase()}|${clean(row.areaCode).toUpperCase()}`);return local?.classification?{...row,classification:local.classification}:row});
+     try{await saveDbAreas(sharedRows,'Existing browser area classification migration');localStorage.setItem(SHARED_AREA_MIGRATION_KEY,'true')}catch{}
+    }
+    setAreas(sharedRows);saveAreas(sharedRows);return
+   }
    setAreas(bundled);saveAreas(bundled);
    try{await saveDbAreas(bundled,'Initial 3-Year Analysis area data')}catch{}
   }).catch(()=>{/* Keep the permanently saved browser copy when Streamlit has no API route. */});
