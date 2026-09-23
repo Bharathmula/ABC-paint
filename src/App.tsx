@@ -41,6 +41,17 @@ const STORAGE_KEY_STOCK = 'orders_dashboard_stock_records_v1';
 const STORAGE_KEY_CLEARED = 'orders_dashboard_cleared_v1';
 const STORAGE_KEY_TRASH = 'orders_dashboard_restore_bin_v2';
 
+// A previous generic XLS parser created placeholder rows instead of reading MARG reports.
+// Remove only that unmistakable artificial dataset; never remove real uploaded orders.
+function isLegacySyntheticDataset(value:unknown):boolean{
+  return Array.isArray(value)&&value.length>0&&value.every((o:any)=>
+    /^Company \d+$/.test(String(o?.companyName||''))&&
+    /^VCH-\d+$/.test(String(o?.voucherNumber||''))&&
+    Number(o?.orderQuantity||0)===0&&Number(o?.value||0)===0&&
+    Array.isArray(o?.items)&&o.items.length===1&&o.items[0]?.name==='Standard Order Batch'
+  );
+}
+
 export type DashboardViewTab = 'stock' | 'reorder' | 'deadline' | 'orders' | 'areas' | 'dispatch' | 'report';
 
 export default function App() {
@@ -56,6 +67,11 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY_ORDERS);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if(isLegacySyntheticDataset(parsed)){
+          localStorage.removeItem(STORAGE_KEY_ORDERS);
+          localStorage.removeItem(STORAGE_KEY_SOURCE);
+          return [];
+        }
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {
@@ -122,6 +138,10 @@ export default function App() {
     let active=true;
     const refreshSharedOrders=()=>loadDbOrders().then((dbOrders) => {
       if(!active)return;
+      if (isLegacySyntheticDataset(dbOrders)) {
+        clearDbOrders().catch(()=>{});
+        setOrders([]);setSourceName('No Data Loaded');return;
+      }
       if (Array.isArray(dbOrders)) {
         const lifecycleOrders = dbOrders.map((o) => applyOrderLifecycle({ ...o, area: resolveAreaCode(o.companyName, o.area) }));
         setOrders(lifecycleOrders);
