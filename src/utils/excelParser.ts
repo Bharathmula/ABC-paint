@@ -23,7 +23,7 @@ export interface ParseExcelResult {
 
 // Convert Excel dates (either serial number or string) to YYYY-MM-DD
 export function formatExcelDate(raw: any): string {
-  if (!raw) return new Date().toISOString().slice(0, 10);
+  if (raw === undefined || raw === null || String(raw).trim() === '') return '';
 
   if (typeof raw === 'number') {
     // Excel serial date to JS Date
@@ -58,7 +58,45 @@ export function formatExcelDate(raw: any): string {
     return parsed.toISOString().slice(0, 10);
   }
 
-  return new Date().toISOString().slice(0, 10);
+  return str;
+}
+
+function isMargSalesOrderReport(matrix:any[][]):boolean {
+  return matrix.some(row=>row.some(cell=>String(cell??'').toUpperCase().includes('SALES ORDER FROM')))
+    && matrix.some(row=>String(row?.[0]??'').trim().toUpperCase()==='ORDER NO.');
+}
+
+function lastNumber(value:any):number {
+  const matches=String(value??'').replace(/,/g,'').match(/-?\d+(?:\.\d+)?/g);
+  return matches?.length ? Number(matches[matches.length-1]) : 0;
+}
+
+function parseMargSalesOrderReport(matrix:any[][],sheetNames:string[]):ParseExcelResult {
+  const orders:Order[]=[]; let current:Order|null=null; let currentDate=''; let itemCounter=0; let sourceRows=0;
+  const dateOnly=/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/;
+  for(let r=0;r<matrix.length;r++){
+    const row=matrix[r]||[]; const a=String(row[0]??'').trim(); const b=String(row[1]??'').trim();
+    if(dateOnly.test(a)){currentDate=a;continue}
+    if(/^OB-/i.test(a)){
+      const value=lastNumber(row[6])||lastNumber(row[2]);
+      const salesPerson=(String(row[2]??'').match(/^\s*([A-Z]+)-?/)?.[1]||'').trim();
+      current={id:`marg-sales-${a}-${orders.length}`,companyName:b,voucherNumber:a,date:currentDate,orderQuantity:0,issue:0,pending:0,rate:0,value,dueDate:'',partyOrderNumber:'',area:getMasterAreaCode(b),salesPerson,items:[],status:'Pending'};
+      orders.push(current); sourceRows++; continue;
+    }
+    if(current && !a && /^\s*\d+\s+/.test(b)){
+      const detail=String(row[3]??'').trim(); const value=Number(String(row[5]??'').replace(/,/g,''))||0; const rate=lastNumber(detail);
+      const quantity=parseMargQuantity(detail.split(/\s+[A-Za-z]+\s+/)[0],rate,value);
+      const unit=detail.match(/\s([A-Za-z]+)\s+-?\d+(?:\.\d+)?\s*$/)?.[1]||'';
+      const name=`${b.replace(/^\s*\d+\s+/,'').trim()}${String(row[2]??'').trim()?` ${String(row[2]).trim()}`:''}`.trim();
+      current.items.push({id:`marg-sales-item-${itemCounter++}`,name,quantity,issue:0,pending:quantity,rate,value:value||quantity*rate,unit});
+      current.orderQuantity+=quantity; current.pending+=quantity; sourceRows++;
+    }
+  }
+  for(const order of orders){
+    if(!order.value)order.value=order.items.reduce((sum,item)=>sum+item.value,0);
+    order.rate=order.orderQuantity?order.value/order.orderQuantity:0;
+  }
+  return {orders,sheetNames,totalRows:sourceRows,internalDuplicatesCount:0,duplicateVouchers:[]};
 }
 
 
@@ -215,11 +253,16 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
     // MARG ERP pending-order exports are report-style sheets: company names are section
     // headings and item rows sit underneath them. They are not ordinary header-row tables.
     const matrix = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: '', raw: false });
+    if (isMargSalesOrderReport(matrix)) {
+      return parseMargSalesOrderReport(matrix, sheetNames);
+    }
     if (isMargPendingOrderReport(matrix)) {
       return parseMargPendingOrderReport(matrix, sheetNames);
     }
 
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+    const headerNames=new Set(['companyname','company','partyname','party','customer','client','vouchernumber','voucherno','orderno','date','orderdate','itemname','item']);
+    const headerRow=matrix.findIndex(row=>row.filter(cell=>headerNames.has(cleanHeader(String(cell??'')))).length>=2);
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '', range:headerRow>=0?headerRow:0 });
 
     if (!rawRows || rawRows.length === 0) {
       return { orders: [], sheetNames, totalRows: 0, internalDuplicatesCount: 0, duplicateVouchers: [], error: 'The active sheet contains no rows or data.' };
@@ -243,8 +286,9 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
         return undefined;
       };
 
-      const companyName = String(findValue(['company name', 'company', 'party name', 'party', 'customer', 'client']) || `Company ${index + 1}`).trim();
-      const voucherNumber = String(findValue(['voucher number', 'voucher no', 'vocher number', 'vocher no', 'voucher', 'vocher', 'bill no', 'inv no']) || `VCH-${1000 + index}`).trim();
+      const companyName = String(findValue(['company name', 'company', 'party name', 'party', 'customer', 'client']) || '').trim();
+      const voucherNumber = String(findValue(['voucher number', 'voucher no', 'vocher number', 'vocher no', 'voucher', 'vocher', 'bill no', 'inv no','order no','order number']) || '').trim();
+      if(!companyName&&!voucherNumber)return;
       const date = formatExcelDate(findValue(['date', 'order date', 'orderdate', 'booking date']));
       
       const rawOrderQty = parseFloat(String(findValue(['order quantity', 'order qty', 'orderquantity', 'orderqty', 'qty', 'quantity', 'total qty']) || '0'));
@@ -269,11 +313,11 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
       }
 
       const dueDate = formatExcelDate(findValue(['due date', 'duedate', 'deadline', 'deadline date', 'delivery date', 'deliverydate']));
-      const partyOrderNumber = String(findValue(['party order number', 'party order no', 'partyordernumber', 'partyorderno', 'party order', 'po number', 'po no', 'ponumber']) || `PO-${index + 101}`).trim();
+      const partyOrderNumber = String(findValue(['party order number', 'party order no', 'partyordernumber', 'partyorderno', 'party order', 'po number', 'po no', 'ponumber']) || '').trim();
       
       const excelArea = String(findValue(['area', 'region', 'location', 'city', 'zone', 'place']) || '').trim();
       const area = excelArea || getMasterAreaCode(companyName) || 'Not Assigned';
-      const salesPerson = String(findValue(['sales person', 'salesperson', 'sales rep', 'executive', 'agent', 'staff']) || 'Sales Representative').trim();
+      const salesPerson = String(findValue(['sales person', 'salesperson', 'sales rep', 'executive', 'agent', 'staff']) || '').trim();
 
       // Items parsing: could be column 'items' or 'item name'
       const rawItems = findValue(['items', 'item', 'item name', 'products', 'product', 'materials', 'material']);
@@ -307,7 +351,7 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
           items = [
             {
               id: `item-${index}-0`,
-              name: parts[0] || 'Standard Paint Coating',
+              name: parts[0] || '',
               quantity: orderQuantity,
               issue: issue,
               pending: pending,
@@ -321,7 +365,7 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
         items = [
           {
             id: `item-${index}-0`,
-            name: 'Standard Order Batch',
+            name: '',
             quantity: orderQuantity,
             issue: issue,
             pending: pending,

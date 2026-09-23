@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Order, FilterCategory, ActiveFilters, StockRecord } from './types';
 import { exportOrdersToExcel, deduplicateAndMergeOrders, downloadOrdersImportTemplate } from './utils/excelParser';
 import {
@@ -21,7 +21,7 @@ import { DailyReport } from './components/DailyReport';
 import { UploadHistorySidebar } from './components/UploadHistorySidebar';
 import { applyOrderLifecycle } from './utils/orderStatus';
 import { syncOrderAreas, resolveAreaCode, loadAreas } from './utils/areaStore';
-import { loadDbOrders, importDbOrders, clearDbOrders } from './utils/api';
+import { loadDbOrders, importDbOrders, clearDbOrders, loadDbStock, saveDbStock } from './utils/api';
 import {
   UploadCloud,
   CheckCircle2,
@@ -44,6 +44,7 @@ const STORAGE_KEY_TRASH = 'orders_dashboard_restore_bin_v2';
 export type DashboardViewTab = 'stock' | 'reorder' | 'deadline' | 'orders' | 'areas' | 'dispatch' | 'report';
 
 export default function App() {
+  const sharedStockReady = useRef(false);
   // Active Tab View - defaults to Stock Records
   const [activeTab, setActiveTab] = useState<DashboardViewTab>('orders');
 
@@ -115,11 +116,13 @@ export default function App() {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [selectedCompanyModal, setSelectedCompanyModal] = useState<string | null>(null);
 
-  // Load persistent orders from PostgreSQL on startup. If PostgreSQL is not configured yet,
-  // keep the browser cache so development can continue without data loss.
+  // PostgreSQL is the shared company dataset. Refresh it regularly so uploads and edits
+  // made on one computer appear on the other open dashboards.
   useEffect(() => {
-    loadDbOrders().then((dbOrders) => {
-      if (Array.isArray(dbOrders) && dbOrders.length > 0) {
+    let active=true;
+    const refreshSharedOrders=()=>loadDbOrders().then((dbOrders) => {
+      if(!active)return;
+      if (Array.isArray(dbOrders)) {
         const lifecycleOrders = dbOrders.map((o) => applyOrderLifecycle({ ...o, area: resolveAreaCode(o.companyName, o.area) }));
         setOrders(lifecycleOrders);
         setStockRecords((prev) => syncStockWithOrders(prev, lifecycleOrders));
@@ -128,7 +131,18 @@ export default function App() {
     }).catch(() => {
       // Database not configured/reachable: preserve local cache.
     });
+    const refreshSharedStock=()=>loadDbStock().then((records)=>{if(!active)return;if(Array.isArray(records)){sharedStockReady.current=true;setStockRecords(records)}}).catch(()=>{});
+    refreshSharedOrders();refreshSharedStock();
+    const timer=window.setInterval(refreshSharedOrders,10000);
+    const stockTimer=window.setInterval(refreshSharedStock,10000);
+    return()=>{active=false;window.clearInterval(timer);window.clearInterval(stockTimer)};
   }, []);
+
+  useEffect(()=>{
+    if(!sharedStockReady.current)return;
+    const timer=window.setTimeout(()=>{saveDbStock(stockRecords).catch(()=>{})},500);
+    return()=>window.clearTimeout(timer);
+  },[stockRecords]);
 
   // Persist orders and stock to local storage
   useEffect(() => {

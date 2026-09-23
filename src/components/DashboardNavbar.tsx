@@ -19,7 +19,7 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
 }) => {
   return (
     <header id="dashboard-navbar" className="bg-slate-900 text-slate-100 border-b border-slate-800 shadow-xs sticky top-0 z-30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-3">
         {/* Brand & Context */}
         <div className="flex items-center gap-3">
           <div className="p-2 bg-slate-800 text-slate-300 rounded-xl border border-slate-700/80 shadow-2xs">
@@ -51,8 +51,19 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
           </div>
         </div>
 
+        {/* Primary upload action stays above and centered. */}
+        <button
+          type="button"
+          id="navbar-load-excel-btn"
+          onClick={onOpenExcelLoader}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg transition-colors border border-blue-400 justify-self-center"
+        >
+          <UploadCloud className="w-5 h-5" />
+          <span>Load Excel Sheet</span>
+        </button>
+
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-center lg:justify-end">
           {/* Download Template button */}
           <button
             type="button"
@@ -91,19 +102,8 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
             <span>Clear Stored Data</span>
           </button>
 
-          {/* Load Excel Sheet Primary Button */}
-          <button
-            type="button"
-            id="navbar-load-excel-btn"
-            onClick={onOpenExcelLoader}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-xl shadow-2xs transition-colors border border-slate-600 hover:border-slate-500"
-          >
-            <UploadCloud className="w-4 h-4 text-sky-400" />
-            <span>Load Excel Sheet</span>
-          </button>
         </div>
       </div>
     </header>
   );
 };
-

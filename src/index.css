@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* Keep the dashboard fixed while a dialog/slide is open; only its own content scrolls. */
+body:has(.fixed.inset-0.z-50) { overflow: hidden; }

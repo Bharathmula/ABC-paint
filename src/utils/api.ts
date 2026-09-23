@@ -1,4 +1,5 @@
 import { Order } from '../types';
+import { StockRecord } from '../types';
 
 const HISTORY_KEY='abc_upload_history_v1';
 type LocalHistory={id:string;sourceFile:string;mode:string;receivedCount:number;insertedCount:number;updatedCount:number;entityType:string;importedAt:string};
@@ -13,6 +14,8 @@ export async function importDbOrders(orders:Order[], sourceFile:string, mode:'me
  if(!r.ok) throw new Error((await r.json()).error||'Database import failed'); return r.json();
 }
 export async function clearDbOrders(){ const r=await fetch('/api/orders',{method:'DELETE'}); if(!r.ok) throw new Error('Database clear failed'); }
+export async function loadDbStock():Promise<StockRecord[]>{const r=await fetch('/api/stock');if(!r.ok)throw new Error('Database not configured');return r.json();}
+export async function saveDbStock(records:StockRecord[]){const r=await fetch('/api/stock',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({records})});if(!r.ok)throw new Error('Stock save failed');return r.json();}
 export async function loadDbAreas(){const r=await fetch('/api/area-master');if(!r.ok)throw new Error('Database not configured');return r.json();}
 export async function saveDbAreas(areas:any[],sourceFile='Manual area update'){addLocalHistory(sourceFile,'merge',areas.length,'areas');const r=await fetch('/api/area-master/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({areas,sourceFile})});if(!r.ok)throw new Error('Area save failed');return r.json();}
 export async function loadImportHistory(){

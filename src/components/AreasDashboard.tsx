@@ -14,12 +14,15 @@ export function AreasDashboard({orders}:{orders:Order[]}){
  const [code,setCode]=useState(''); const [company,setCompany]=useState(''); const [cls,setCls]=useState<AreaClass>('Local');
  const [message,setMessage]=useState(''); const fileRef=useRef<HTMLInputElement>(null);
  useEffect(()=>{
+  let active=true;
   const bundled=loadAreas();
-  loadDbAreas().then(async(rows)=>{
+  const refresh=()=>loadDbAreas().then(async(rows)=>{
+   if(!active)return;
    if(Array.isArray(rows)&&rows.length>0){setAreas(rows);saveAreas(rows);return}
    setAreas(bundled);saveAreas(bundled);
    try{await saveDbAreas(bundled,'Initial 3-Year Analysis area data')}catch{}
   }).catch(()=>{setAreas(bundled)});
+  refresh();const timer=window.setInterval(refresh,10000);return()=>{active=false;window.clearInterval(timer)};
  },[]);
  const persist=async(next:AreaEntry[],source='Manual area update')=>{setAreas(next);saveAreas(next);try{await saveDbAreas(next,source);setMessage(`${message||'Areas updated'} Saved permanently in PostgreSQL.`)}catch{setMessage(`${message||'Areas updated'} Database unavailable; saved in this browser.`)}};
  const stats=useMemo(()=>{const m=new Map<string,{n:number;q:number}>();orders.filter(o=>o.pending>0).forEach(o=>{const k=o.companyName.trim().toUpperCase();const x=m.get(k)||{n:0,q:0};x.n++;x.q+=o.pending;m.set(k,x)});return m},[orders]);

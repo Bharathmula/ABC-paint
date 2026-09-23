@@ -33,6 +33,11 @@ async function initDb() {
       source_file TEXT,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS stock_records (
+      id TEXT PRIMARY KEY,
+      stock_data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS import_history (
       id BIGSERIAL PRIMARY KEY,
       source_file TEXT NOT NULL,
@@ -152,6 +157,19 @@ app.post('/api/orders/import', async (req,res) => {
 app.delete('/api/orders', async (_req,res) => {
   if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
   await pool.query('DELETE FROM orders'); res.json({ok:true});
+});
+
+app.get('/api/stock', async (_req,res) => {
+  if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
+  const q=await pool.query('SELECT stock_data FROM stock_records ORDER BY updated_at DESC');
+  res.json(q.rows.map(r=>r.stock_data));
+});
+
+app.put('/api/stock', async (req,res) => {
+  if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
+  const records=Array.isArray(req.body?.records)?req.body.records:[];const client=await pool.connect();
+  try{await client.query('BEGIN');await client.query('DELETE FROM stock_records');for(const record of records){await client.query('INSERT INTO stock_records(id,stock_data) VALUES($1,$2::jsonb)',[String(record.id),JSON.stringify(record)])}await client.query('COMMIT')}catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
+  res.json({ok:true,total:records.length});
 });
 
 await initDb();
