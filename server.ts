@@ -70,6 +70,8 @@ function norm(s='') { return s.toUpperCase().replace(/[^A-Z0-9]/g,''); }
 function dedupKey(o:any) {
   const v=String(o.voucherNumber||'').trim().toLowerCase();
   if (v && !v.startsWith('vch-autogen') && v !== 'n/a') return `vch:${v}`;
+  const sk=String(o.skNumber||'').trim().toLowerCase();
+  if (sk && sk !== 'n/a') return `sk:${sk}`;
   const po=String(o.partyOrderNumber||'').trim().toLowerCase();
   const c=String(o.companyName||'').trim().toLowerCase();
   if (po && po !== 'n/a') return `po:${c}___${po}`;
