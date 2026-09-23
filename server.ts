@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '15mb' }));
+app.use((req,res,next)=>{
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if(req.method==='OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false } }) : null;
