@@ -2,3 +2,20 @@
 
 /* Keep the dashboard fixed while a dialog/slide is open; only its own content scrolls. */
 body:has(.fixed.inset-0.z-50) { overflow: hidden; }
+
+/* Keep the Excel upload action with the controls on the right on desktop. */
+@media (min-width: 1024px) {
+  #dashboard-navbar > div {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}
+
+/* Open the Excel upload panel near the upper center of the viewport. */
+#excel-loader-modal-overlay {
+  align-items: flex-start;
+  padding-top: 5rem;
+}
+
+#excel-loader-modal-container {
+  max-height: calc(100vh - 6rem);
+}
