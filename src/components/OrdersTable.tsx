@@ -31,6 +31,7 @@ interface OrdersTableProps {
 type SortField =
   | 'companyName'
   | 'voucherNumber'
+  | 'skNumber'
   | 'date'
   | 'orderQuantity'
   | 'issue'
@@ -83,7 +84,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
-      setSortAsc(field === 'companyName' || field === 'voucherNumber');
+      setSortAsc(field === 'companyName' || field === 'voucherNumber' || field === 'skNumber');
     }
   };
 
@@ -276,7 +277,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
 
       {/* Table Container with EXACT 10 COLUMNS */}
       <div className="overflow-x-auto">
-        <table id="orders-main-table" className="w-full text-left text-xs whitespace-nowrap">
+        <table id="orders-main-table" className="w-max min-w-[1420px] text-left text-xs whitespace-nowrap">
           <thead className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
             <tr>
               <th className="py-3 px-2 w-8 text-center"></th>
@@ -299,6 +300,16 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                 <div className="flex items-center gap-1.5">
                   <span>Voucher Number</span>
                   {renderSortIcon('voucherNumber')}
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('skNumber')}
+                className="py-3 px-3 cursor-pointer select-none group hover:bg-slate-200/60 transition-colors min-w-[115px]"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>SK Number</span>
+                  {renderSortIcon('skNumber')}
                 </div>
               </th>
 
@@ -396,7 +407,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
           <tbody className="divide-y divide-slate-100">
             {sortedOrders.length === 0 ? (
               <tr>
-                <td colSpan={12} className="py-12 text-center text-slate-500">
+                <td colSpan={13} className="py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="w-8 h-8 text-slate-400" />
                     <p className="text-sm font-semibold text-slate-700">
@@ -525,6 +536,12 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                         </span>
                       </td>
 
+                      <td className="py-3 px-3 font-mono font-semibold text-slate-700">
+                        <span className="bg-blue-50 px-2 py-0.5 rounded text-[11px] border border-blue-100">
+                          {order.skNumber || '—'}
+                        </span>
+                      </td>
+
                       {/* 3. Date - Highlighted if Today */}
                       <td className="py-3 px-3 font-mono">
                         <div className="flex items-center gap-1.5">
@@ -631,7 +648,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                     {/* Inline expanded item drawer */}
                     {isExpanded && (
                       <tr className="bg-slate-50/90 border-b border-slate-200">
-                        <td colSpan={12} className="p-3 sm:px-6">
+                        <td colSpan={13} className="p-3 sm:px-6">
                           <div className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-2 font-semibold text-slate-800">
