@@ -40,6 +40,7 @@ const STORAGE_KEY_SOURCE = 'orders_dashboard_source_name_v1';
 const STORAGE_KEY_STOCK = 'orders_dashboard_stock_records_v1';
 const STORAGE_KEY_CLEARED = 'orders_dashboard_cleared_v1';
 const STORAGE_KEY_TRASH = 'orders_dashboard_restore_bin_v2';
+const STORAGE_KEY_SHARED_MIGRATION = 'orders_dashboard_shared_migration_v1';
 
 // A previous generic XLS parser created placeholder rows instead of reading MARG reports.
 // Remove only that unmistakable artificial dataset; never remove real uploaded orders.
@@ -79,6 +80,8 @@ export default function App() {
     }
     return [];
   });
+  const initialBrowserOrders = useRef<Order[]>(orders);
+  const sharedMigrationPending = useRef(localStorage.getItem(STORAGE_KEY_SHARED_MIGRATION) !== 'true');
 
   // Stock records remain locally cached until a stock-master database import is added
   const [stockRecords, setStockRecords] = useState<StockRecord[]>(() => {
@@ -136,14 +139,26 @@ export default function App() {
   // made on one computer appear on the other open dashboards.
   useEffect(() => {
     let active=true;
-    const refreshSharedOrders=()=>loadDbOrders().then((dbOrders) => {
+    const refreshSharedOrders=()=>loadDbOrders().then(async(dbOrders) => {
       if(!active)return;
       if (isLegacySyntheticDataset(dbOrders)) {
         clearDbOrders().catch(()=>{});
         setOrders([]);setSourceName('No Data Loaded');return;
       }
       if (Array.isArray(dbOrders)) {
-        const lifecycleOrders = dbOrders.map((o) => applyOrderLifecycle({ ...o, area: resolveAreaCode(o.companyName, o.area) }));
+        let sharedOrders = dbOrders;
+        const browserOrders = initialBrowserOrders.current;
+        if (sharedMigrationPending.current && browserOrders.length > 0 && !isLegacySyntheticDataset(browserOrders)) {
+          sharedMigrationPending.current = false;
+          try {
+            const migrated = await importDbOrders(browserOrders, 'Existing browser data migration', 'merge');
+            sharedOrders = migrated.orders;
+            localStorage.setItem(STORAGE_KEY_SHARED_MIGRATION, 'true');
+          } catch {
+            sharedMigrationPending.current = true;
+          }
+        }
+        const lifecycleOrders = sharedOrders.map((o) => applyOrderLifecycle({ ...o, area: resolveAreaCode(o.companyName, o.area) }));
         setOrders(lifecycleOrders);
         setStockRecords((prev) => syncStockWithOrders(prev, lifecycleOrders));
         setSourceName('PostgreSQL Database');
