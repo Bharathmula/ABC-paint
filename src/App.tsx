@@ -302,7 +302,7 @@ export default function App() {
     if (target === 'dispatch' || target === 'all') snapshot.dispatchPlans = localStorage.getItem('abc_dispatch_plans') || '[]';
     pushTrash(snapshot);
     if (target === 'orders' || target === 'all') { try { await clearDbOrders(); } catch {} setOrders([]); localStorage.removeItem(STORAGE_KEY_ORDERS); }
-    if (target === 'stock' || target === 'all') { setStockRecords([]); localStorage.removeItem(STORAGE_KEY_STOCK); }
+    if (target === 'stock' || target === 'all') { try { await saveDbStock([]); } catch {} setStockRecords([]); localStorage.removeItem(STORAGE_KEY_STOCK); }
     if (target === 'dispatch' || target === 'all') localStorage.removeItem('abc_dispatch_plans');
     if (target === 'all') { setSourceName('No Data Loaded'); localStorage.removeItem(STORAGE_KEY_SOURCE); }
     setToastMessage(`${snapshot.label} moved to Recycle Bin.`);
