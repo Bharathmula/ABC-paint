@@ -66,21 +66,26 @@ function isMargSalesOrderReport(matrix:any[][]):boolean {
     && matrix.some(row=>String(row?.[0]??'').trim().toUpperCase()==='ORDER NO.');
 }
 
+function isMargSalesBillReport(matrix:any[][]):boolean {
+  return matrix.some(row=>row.some(cell=>/\bSALE FROM\b/i.test(String(cell??''))))
+    && matrix.some(row=>cleanHeader(String(row?.[0]??''))==='billno');
+}
+
 function lastNumber(value:any):number {
   const matches=String(value??'').replace(/,/g,'').match(/-?\d+(?:\.\d+)?/g);
   return matches?.length ? Number(matches[matches.length-1]) : 0;
 }
 
-function parseMargSalesOrderReport(matrix:any[][],sheetNames:string[]):ParseExcelResult {
+function parseMargSalesOrderReport(matrix:any[][],sheetNames:string[], billReport=false):ParseExcelResult {
   const orders:Order[]=[]; let current:Order|null=null; let currentDate=''; let itemCounter=0; let sourceRows=0;
   const dateOnly=/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/;
   for(let r=0;r<matrix.length;r++){
     const row=matrix[r]||[]; const a=String(row[0]??'').trim(); const b=String(row[1]??'').trim();
-    if(dateOnly.test(a)){currentDate=a;continue}
-    if(/^OB-/i.test(a)){
+    if(dateOnly.test(a)){currentDate=formatExcelDate(a);continue}
+    if((billReport ? /^SK-/i : /^OB-/i).test(a)){
       const value=lastNumber(row[6])||lastNumber(row[2]);
       const salesPerson=(String(row[2]??'').match(/^\s*([A-Z]+)-?/)?.[1]||'').trim();
-      current={id:`marg-sales-${a}-${orders.length}`,companyName:b,voucherNumber:a,date:currentDate,orderQuantity:0,issue:0,pending:0,rate:0,value,dueDate:'',partyOrderNumber:'',area:getMasterAreaCode(b),salesPerson,items:[],status:'Pending'};
+      current={id:`marg-sales-${a}-${orders.length}`,companyName:b,voucherNumber:billReport?'':a,skNumber:billReport?a:'',date:currentDate,orderQuantity:0,issue:0,pending:0,rate:0,value,dueDate:currentDate,partyOrderNumber:'',area:getMasterAreaCode(b)||'Not Assigned',salesPerson,items:[],status:billReport?'Completed':'Pending'};
       orders.push(current); sourceRows++; continue;
     }
     if(current && !a && /^\s*\d+\s+/.test(b)){
@@ -88,8 +93,9 @@ function parseMargSalesOrderReport(matrix:any[][],sheetNames:string[]):ParseExce
       const quantity=parseMargQuantity(detail.split(/\s+[A-Za-z]+\s+/)[0],rate,value);
       const unit=detail.match(/\s([A-Za-z]+)\s+-?\d+(?:\.\d+)?\s*$/)?.[1]||'';
       const name=`${b.replace(/^\s*\d+\s+/,'').trim()}${String(row[2]??'').trim()?` ${String(row[2]).trim()}`:''}`.trim();
-      current.items.push({id:`marg-sales-item-${itemCounter++}`,name,quantity,issue:0,pending:quantity,rate,value:value||quantity*rate,unit});
-      current.orderQuantity+=quantity; current.pending+=quantity; sourceRows++;
+      const issued=billReport?quantity:0; const pending=billReport?0:quantity;
+      current.items.push({id:`marg-sales-item-${itemCounter++}`,name,quantity,issue:issued,pending,rate,value:value||quantity*rate,unit});
+      current.orderQuantity+=quantity; current.issue+=issued; current.pending+=pending; sourceRows++;
     }
   }
   for(const order of orders){
@@ -253,6 +259,9 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
     // MARG ERP pending-order exports are report-style sheets: company names are section
     // headings and item rows sit underneath them. They are not ordinary header-row tables.
     const matrix = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: '', raw: false });
+    if (isMargSalesBillReport(matrix)) {
+      return parseMargSalesOrderReport(matrix, sheetNames, true);
+    }
     if (isMargSalesOrderReport(matrix)) {
       return parseMargSalesOrderReport(matrix, sheetNames);
     }
@@ -288,7 +297,8 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
 
       const companyName = String(findValue(['company name', 'company', 'party name', 'party', 'customer', 'client']) || '').trim();
       const voucherNumber = String(findValue(['voucher number', 'voucher no', 'vocher number', 'vocher no', 'voucher', 'vocher', 'bill no', 'inv no','order no','order number']) || '').trim();
-      if(!companyName&&!voucherNumber)return;
+      const skNumber = String(findValue(['sk number', 'sk no', 'sknumber', 'skno']) || '').trim();
+      if(!companyName&&!voucherNumber&&!skNumber)return;
       const date = formatExcelDate(findValue(['date', 'order date', 'orderdate', 'booking date']));
       
       const rawOrderQty = parseFloat(String(findValue(['order quantity', 'order qty', 'orderquantity', 'orderqty', 'qty', 'quantity', 'total qty']) || '0'));
@@ -390,6 +400,7 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
         id: `ord-uploaded-${index + 1}`,
         companyName,
         voucherNumber,
+        skNumber,
         date,
         orderQuantity,
         issue,
@@ -514,7 +525,7 @@ export function deduplicateAndMergeOrders(
 // Download blank Orders Import Template XLSX
 export function downloadOrdersImportTemplate(): void {
   const headers = [{
-    'Company Name':'','Voucher Number':'','Date':'','Order Quantity':'','Issue':'','Pending':'','Rate':'','Value':'','Due Date':'','Party Order Number':'','Area':'','Sales Person':'','Items':''
+    'Company Name':'','Voucher Number':'','SK Number':'','Date':'','Order Quantity':'','Issue':'','Pending':'','Rate':'','Value':'','Due Date':'','Party Order Number':'','Area':'','Sales Person':'','Items':''
   }];
   const ws = XLSX.utils.json_to_sheet(headers);
   const wb = XLSX.utils.book_new();
@@ -527,6 +538,7 @@ export function exportOrdersToExcel(orders: Order[], fileName = 'Orders_Export.x
   const exportData = orders.map((o) => ({
     'Company Name': o.companyName,
     'Voucher Number': o.voucherNumber,
+    'SK Number': o.skNumber || '',
     'Date': o.date,
     'Order Quantity': o.orderQuantity,
     'Issue': o.issue,
@@ -552,6 +564,7 @@ export function exportOrdersToExcel(orders: Order[], fileName = 'Orders_Export.x
 export function getOrderDeduplicationKey(order: any): string {
   const party = String(order?.partyName || order?.companyName || order?.company || '').trim().toLowerCase();
   const voucher = String(order?.voucherNumber || order?.voucherNo || order?.orderNumber || order?.orderNo || order?.entryNumber || '').trim().toLowerCase();
+  const sk = String(order?.skNumber || order?.skNo || '').trim().toLowerCase();
   const po = String(order?.partyOrderNumber || order?.partyOrderNo || order?.poNumber || '').trim().toLowerCase();
-  return `${party}|${voucher}|${po}`;
+  return `${party}|${voucher || sk}|${po}`;
 }
