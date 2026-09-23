@@ -27,10 +27,12 @@ export interface Order {
   status?: 'Completed' | 'Partial' | 'Pending' | 'Overdue';
   notes?: string;
   skNumber?: string;
+  /** Workflow marker: dispatch moves the order to RTG; RTG completion moves it to Finished. */
+  rtg?: boolean;
   /** Excel/import file this order most recently came from. */
   sourceFile?: string;
   /** Previous quantities saved when a user action finishes an order, enabling one-click Undo. */
-  completionUndo?: { issue: number; pending: number; status?: 'Completed' | 'Partial' | 'Pending' | 'Overdue'; items: OrderItem[]; skNumber?: string };
+  completionUndo?: { issue: number; pending: number; status?: 'Completed' | 'Partial' | 'Pending' | 'Overdue'; items: OrderItem[]; skNumber?: string; rtg?: boolean };
 }
 
 export type FilterCategory = 'area' | 'areaClass' | 'party' | 'deadline' | 'salesPerson' | 'item';

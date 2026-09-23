@@ -24,7 +24,7 @@ interface OrdersTableProps {
   onSelectCompany: (companyName: string) => void;
   onClearFilters?: () => void;
   onCompleteOrder?: (order: Order, skNumber: string) => void;
-  onRecordDispatch?: (order: Order, quantity: number, skNumber: string) => void;
+  onRecordDispatch?: (order: Order, skNumber: string) => void;
   onUndoComplete?: (order: Order) => void;
 }
 
@@ -54,7 +54,6 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusViewFilter>('all');
-  const [dispatchQty, setDispatchQty] = useState<Record<string, string>>({});
   const [skNumbers, setSkNumbers] = useState<Record<string, string>>({});
 
   // Overall metrics
@@ -66,7 +65,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
       case 'today':
         return orders.filter((o) => isOrderToday(o.date));
       case 'rtg':
-        return orders.filter((o) => o.issue > 0 && o.pending > 0);
+        return orders.filter((o) => o.rtg === true && isOrderUnfinished(o));
       case 'overdue':
         return orders.filter((o) => isOverdueAfterThreeDays(o));
       case 'unfinished':
@@ -192,7 +191,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
 
           <button type="button" onClick={() => setStatusFilter('rtg')} className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl shrink-0 ${statusFilter === 'rtg' ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-900 border border-violet-200'}`}>
             <Package className="w-3.5 h-3.5" /><span>RTG</span>
-            <span className="px-1.5 rounded-full text-[10px] font-mono">{orders.filter(o => o.issue > 0 && o.pending > 0).length}</span>
+            <span className="px-1.5 rounded-full text-[10px] font-mono">{orders.filter(o => o.rtg === true && isOrderUnfinished(o)).length}</span>
           </button>
           <button type="button" onClick={() => setStatusFilter('overdue')} className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl shrink-0 ${statusFilter === 'overdue' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-900 border border-rose-200'}`}>
             <AlertTriangle className="w-3.5 h-3.5" /><span>Overdue (3+ Days)</span>
@@ -607,13 +606,18 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {isUnfinished ? (
+                        {isUnfinished && order.rtg && statusFilter === 'rtg' ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="px-2 py-1.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-200 text-[11px] font-bold">RTG · SK {order.skNumber}</span>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onCompleteOrder?.(order,order.skNumber||''); }} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold">Complete</button>
+                            {order.completionUndo && <button type="button" onClick={(e)=>{e.stopPropagation();onUndoComplete?.(order)}} className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-bold">Undo</button>}
+                          </div>
+                        ) : isUnfinished && order.rtg ? (
+                          <span className="px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-200 text-[11px] font-bold">In RTG</span>
+                        ) : isUnfinished ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <input type="text" value={skNumbers[order.id] ?? order.skNumber ?? ''} onChange={(e) => setSkNumbers(prev => ({...prev, [order.id]: e.target.value}))} placeholder="SK Number *" className="w-24 px-2 py-1.5 rounded-lg border border-slate-300 text-[11px]" />
-                            <input type="number" min="1" max={order.pending} value={dispatchQty[order.id] ?? ''} onChange={(e) => setDispatchQty(prev => ({...prev, [order.id]: e.target.value}))} placeholder={`Qty ≤ ${order.pending}`} className="w-20 px-2 py-1.5 rounded-lg border border-slate-300 text-[11px]" />
-                            <button type="button" onClick={(e) => { e.stopPropagation(); const q=Number(dispatchQty[order.id]); const sk=(skNumbers[order.id]||order.skNumber||'').trim(); if(q>0&&sk) { onRecordDispatch?.(order, q, sk); setDispatchQty(prev=>({...prev,[order.id]:''})); } }} disabled={!(skNumbers[order.id]||order.skNumber||'').trim()} className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-[11px] font-bold">Dispatch</button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); const sk=(skNumbers[order.id]||order.skNumber||'').trim(); if(sk) onCompleteOrder?.(order,sk); }} disabled={!(skNumbers[order.id]||order.skNumber||'').trim()} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-bold">Complete</button>
-                            {order.completionUndo && <button type="button" onClick={(e)=>{e.stopPropagation();onUndoComplete?.(order)}} className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-bold">Undo</button>}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); const sk=(skNumbers[order.id]||order.skNumber||'').trim(); if(sk) onRecordDispatch?.(order,sk); }} disabled={!(skNumbers[order.id]||order.skNumber||'').trim()} className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-[11px] font-bold">Dispatch</button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-2">

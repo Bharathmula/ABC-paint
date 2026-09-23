@@ -534,24 +534,13 @@ export default function App() {
   }, [orders, activeFilters]);
 
   // Export current filtered orders to Excel
-  const handleRecordDispatch = async (order: Order, requestedQty: number, skNumber: string) => {
-    const qty = Math.max(0, Math.min(Number(requestedQty) || 0, order.pending));
-    if (qty <= 0) { setToastMessage('Enter a dispatch quantity greater than 0.'); return; }
-    const newIssue = Math.min(order.orderQuantity, order.issue + qty);
-    const newPending = Math.max(0, order.orderQuantity - newIssue);
-    let remainingToAllocate = qty;
-    const nextItems = order.items.map((item) => {
-      if (remainingToAllocate <= 0 || item.pending <= 0) return item;
-      const itemQty = Math.min(item.pending, remainingToAllocate);
-      remainingToAllocate -= itemQty;
-      return { ...item, issue: item.issue + itemQty, pending: item.pending - itemQty };
-    });
-    const updated = applyOrderLifecycle({ ...order, skNumber, issue: newIssue, pending: newPending, items: nextItems, completionUndo: { issue: order.issue, pending: order.pending, status: order.status, items: order.items.map(i=>({...i})), skNumber: order.skNumber } });
+  const handleRecordDispatch = async (order: Order, skNumber: string) => {
+    const updated = applyOrderLifecycle({ ...order, skNumber, rtg:true, completionUndo: { issue: order.issue, pending: order.pending, status: order.status, items: order.items.map(i=>({...i})), skNumber: order.skNumber, rtg:order.rtg } });
     const nextOrders = orders.map((o) => o.id === order.id ? updated : o).map(applyOrderLifecycle);
     setOrders(nextOrders);
     setStockRecords((prev) => syncStockWithOrders(prev, nextOrders));
     try { await importDbOrders([updated], 'Dashboard partial dispatch', 'merge'); } catch { /* browser cache remains */ }
-    setToastMessage(newPending === 0 ? `${order.voucherNumber || order.id}: all ${order.orderQuantity} units dispatched — moved to Finished Orders.` : `${order.voucherNumber || order.id}: dispatched ${qty}; ${newPending} units still pending.`);
+    setToastMessage(`${order.voucherNumber || order.id} moved to RTG.`);
   };
 
   const handleCompleteOrder = async (order: Order, skNumber: string) => {
@@ -560,9 +549,10 @@ export default function App() {
       skNumber,
       issue: order.orderQuantity,
       pending: 0,
+      rtg: false,
       status: 'Completed',
       items: order.items.map((item) => ({ ...item, issue: item.quantity, pending: 0 })),
-      completionUndo: { issue: order.issue, pending: order.pending, status: order.status, items: order.items.map(i=>({...i})), skNumber: order.skNumber },
+      completionUndo: { issue: order.issue, pending: order.pending, status: order.status, items: order.items.map(i=>({...i})), skNumber: order.skNumber, rtg:order.rtg },
     });
     const nextOrders = orders.map((o) => o.id === order.id ? completed : o).map(applyOrderLifecycle);
     setOrders(nextOrders);
@@ -579,7 +569,7 @@ export default function App() {
   const handleUndoComplete = async (order: Order) => {
     const snap = order.completionUndo;
     if (!snap) { setToastMessage('This finished order has no dashboard completion snapshot to undo.'); return; }
-    const restored = applyOrderLifecycle({ ...order, skNumber: snap.skNumber, issue: snap.issue, pending: snap.pending, status: snap.status, items: snap.items.map(i=>({...i})), completionUndo: undefined });
+    const restored = applyOrderLifecycle({ ...order, skNumber: snap.skNumber, issue: snap.issue, pending: snap.pending, status: snap.status, rtg:snap.rtg, items: snap.items.map(i=>({...i})), completionUndo: undefined });
     const nextOrders = orders.map(o => o.id === order.id ? restored : o).map(applyOrderLifecycle);
     setOrders(nextOrders);
     setStockRecords(prev => syncStockWithOrders(prev, nextOrders));

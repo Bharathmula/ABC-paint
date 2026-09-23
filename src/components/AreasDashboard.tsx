@@ -21,12 +21,12 @@ export function AreasDashboard({orders}:{orders:Order[]}){
    if(Array.isArray(rows)&&rows.length>0){setAreas(rows);saveAreas(rows);return}
    setAreas(bundled);saveAreas(bundled);
    try{await saveDbAreas(bundled,'Initial 3-Year Analysis area data')}catch{}
-  }).catch(()=>{setAreas(bundled)});
+  }).catch(()=>{/* Keep the permanently saved browser copy when Streamlit has no API route. */});
   refresh();const timer=window.setInterval(refresh,10000);return()=>{active=false;window.clearInterval(timer)};
  },[]);
  const persist=async(next:AreaEntry[],source='Manual area update')=>{setAreas(next);saveAreas(next);try{await saveDbAreas(next,source);setMessage(`${message||'Areas updated'} Saved permanently in PostgreSQL.`)}catch{setMessage(`${message||'Areas updated'} Database unavailable; saved in this browser.`)}};
  const stats=useMemo(()=>{const m=new Map<string,{n:number;q:number}>();orders.filter(o=>o.pending>0).forEach(o=>{const k=o.companyName.trim().toUpperCase();const x=m.get(k)||{n:0,q:0};x.n++;x.q+=o.pending;m.set(k,x)});return m},[orders]);
- const filtered=useMemo(()=>{const q=search.toLowerCase().trim();return areas.filter(a=>!q||a.areaCode.toLowerCase().includes(q)||a.companyName.toLowerCase().includes(q)||a.classification.toLowerCase().includes(q))},[areas,search]);
+ const filtered=useMemo(()=>{const q=search.toLowerCase().trim();return areas.filter(a=>!q||a.areaCode.toLowerCase().includes(q)||a.companyName.toLowerCase().includes(q)||a.classification.toLowerCase().includes(q)).sort((a,b)=>a.areaCode.localeCompare(b.areaCode,undefined,{numeric:true,sensitivity:'base'})||a.companyName.localeCompare(b.companyName,undefined,{sensitivity:'base'}))},[areas,search]);
  const add=()=>{if(!code.trim()||!company.trim()){setMessage('Enter both Area Code and Company Name.');return}const id=`manual-${Date.now()}`;setMessage(`${cls} area added.`);persist([...areas,{id,code:id,areaCode:code.trim(),companyName:company.trim(),classification:cls,custom:true}],`${cls} manual entry`);setCode('');setCompany('')};
  const remove=()=>{persist(areas.filter(a=>!selected.includes(a.id)));setSelected([]);setMessage('Selected area records removed.')};
  const move=(classification:AreaClass)=>{setMessage(`${selected.length} record(s) moved to ${classification}.`);persist(areas.map(a=>selected.includes(a.id)?{...a,classification}:a),`Classified as ${classification}`);setSelected([])};
