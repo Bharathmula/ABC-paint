@@ -538,6 +538,7 @@ export default function App() {
         const matchesQuery =
           order.companyName.toLowerCase().includes(q) ||
           order.voucherNumber.toLowerCase().includes(q) ||
+          (order.skNumber || '').toLowerCase().includes(q) ||
           order.partyOrderNumber.toLowerCase().includes(q) ||
           order.area.toLowerCase().includes(q) ||
           order.salesPerson.toLowerCase().includes(q) ||

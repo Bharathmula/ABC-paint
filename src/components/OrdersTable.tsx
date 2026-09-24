@@ -53,7 +53,7 @@ export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilte
         <div className="flex gap-2 items-center"><h2 className="font-bold text-lg">Orders &amp; Packing</h2><b className="text-xs bg-slate-200 rounded-full px-2.5 py-1">{shown.length}</b></div>
         <span className="text-xs text-slate-500">Click an order tile to open its complete details.</span>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">{tabs.map(([key,label,count,icon,color])=><button key={key} onClick={()=>{setView(key);setOpen(null)}} className={`shrink-0 inline-flex gap-2 items-center rounded-lg border px-3 py-2 text-xs font-bold ${view===key?`${color} text-white`:'bg-white text-slate-700'}`}>{icon}{label}<span className="rounded bg-black/10 px-1.5">{count}</span></button>)}</div>
+      <div className="flex gap-2 overflow-x-auto pb-1">{tabs.map(([key,label,count,icon,color])=><button key={key} onClick={()=>{setView(key);setOpen(null)}} className={`shrink-0 inline-flex gap-2 items-center rounded-lg border border-transparent px-3 py-2 text-xs font-bold text-white transition ${color} ${view===key?'opacity-100 shadow-md ring-2 ring-offset-1 ring-slate-400':'opacity-70 hover:opacity-90'}`}>{icon}{label}<span className="rounded bg-black/20 px-1.5">{count}</span></button>)}</div>
     </header>
 
     <div className="p-3 sm:p-4 bg-slate-100 min-h-[300px]">
