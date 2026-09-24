@@ -41,7 +41,8 @@ streamlit run streamlit_app.py
 
 - GitHub stores the complete monorepo and version history.
 - Streamlit Cloud runs `streamlit_app.py` and serves the committed `dist/` build.
-- Render runs `npm run dev`, exposes the API, and connects to PostgreSQL.
+- Render build command: `npm install --legacy-peer-deps && npm run build`.
+- Render start command: `npm start`. Production serves `dist/` directly and never starts Vite.
 - `VITE_API_BASE_URL` may override the Render API URL during frontend builds.
 - `DATABASE_URL` belongs only in deployment secrets or a local ignored `.env` file.
 

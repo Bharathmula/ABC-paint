@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { Pool } from 'pg';
-import { createServer as createViteServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +24,13 @@ app.use((req,res,next)=>{
 });
 
 const databaseUrl = process.env.DATABASE_URL;
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false } }) : null;
+const pool = databaseUrl ? new Pool({
+  connectionString: databaseUrl,
+  ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+  max: 5,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+}) : null;
 
 async function initDb() {
   if (!pool) return;
@@ -217,11 +222,30 @@ app.put('/api/stock', async (req,res) => {
 });
 
 await initDb();
-const vite = await createViteServer({
-  root: path.join(__dirname, '..', 'frontend'),
-  configFile: path.join(__dirname, '..', 'frontend', 'vite.config.ts'),
-  server: { middlewareMode: true },
-  appType: 'spa'
-});
-app.use(vite.middlewares);
-app.listen(3000,'0.0.0.0',()=>console.log('Paint Dashboard: http://localhost:3000'));
+
+const isProduction=process.env.NODE_ENV==='production'||process.env.RENDER==='true';
+if(isProduction){
+  // Render serves the compiled dashboard. Do not load Vite or its dependency
+  // optimizer in production; it uses substantial memory and can restart a
+  // small service instance.
+  const distPath=path.join(__dirname,'..','dist');
+  app.use(express.static(distPath,{maxAge:'1h',index:false}));
+  app.get('*',(_req,res)=>{
+    const indexPath=path.join(distPath,'index.html');
+    if(!fs.existsSync(indexPath))return res.status(503).send('Dashboard build is missing. Run npm run build.');
+    res.sendFile(indexPath);
+  });
+}else{
+  // Hot reloading and dependency optimization are useful only on a developer computer.
+  const {createServer:createViteServer}=await import('vite');
+  const vite=await createViteServer({
+    root:path.join(__dirname,'..','frontend'),
+    configFile:path.join(__dirname,'..','frontend','vite.config.ts'),
+    server:{middlewareMode:true},
+    appType:'spa'
+  });
+  app.use(vite.middlewares);
+}
+
+const port=Number(process.env.PORT||3000);
+app.listen(port,'0.0.0.0',()=>console.log(`Paint Dashboard API listening on port ${port} (${isProduction?'production':'development'})`));

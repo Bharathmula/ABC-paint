@@ -92,3 +92,5 @@ git push origin main
 4. The frontend API base points to Render.
 5. Streamlit uses `streamlit_app.py`.
 6. Secrets and local `.env` files are not committed.
+
+Render should use `npm install --legacy-peer-deps && npm run build` as its build command and `npm start` as its start command. The backend detects Render and serves the compiled `dist/` directory without loading the Vite development server.
