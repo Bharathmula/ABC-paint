@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileSpreadsheet, UploadCloud, Download, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, UploadCloud, Download, Trash2, Clock3 } from 'lucide-react';
 import { downloadOrdersImportTemplate } from '../utils/excelParser';
 
 interface DashboardNavbarProps {
@@ -8,6 +8,7 @@ interface DashboardNavbarProps {
   onClearAllData: () => void;
   currentSource: string;
   orderCount: number;
+  lastUpdated?: string | null;
 }
 
 export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
@@ -16,6 +17,7 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
   onClearAllData,
   currentSource,
   orderCount,
+  lastUpdated,
 }) => {
   return (
     <header id="dashboard-navbar" className="bg-slate-900 text-slate-100 border-b border-slate-800 shadow-xs sticky top-0 z-30">
@@ -56,6 +58,7 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
           type="button"
           id="navbar-load-excel-btn"
           onClick={onOpenExcelLoader}
+          title="Load Excel Sheet (Alt+U)"
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg transition-colors border border-blue-400 justify-self-center"
         >
           <UploadCloud className="w-5 h-5" />
@@ -64,6 +67,10 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap justify-center lg:justify-end">
+          <div className="w-full flex items-center justify-center lg:justify-end gap-1.5 text-[11px] text-sky-200" title="Time of the latest Excel report stored in the shared database">
+            <Clock3 className="w-3.5 h-3.5" />
+            <span>Last data upload: <strong className="text-white">{lastUpdated ? new Date(lastUpdated).toLocaleString('en-IN') : 'No upload recorded'}</strong></span>
+          </div>
           {/* Download Template button */}
           <button
             type="button"

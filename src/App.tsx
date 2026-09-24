@@ -22,7 +22,7 @@ import { UploadHistorySidebar } from './components/UploadHistorySidebar';
 import { OrderEditModal } from './components/OrderEditModal';
 import { applyOrderLifecycle } from './utils/orderStatus';
 import { syncOrderAreas, resolveAreaCode, loadAreas } from './utils/areaStore';
-import { loadDbOrders, importDbOrders, clearDbOrders, loadDbStock, saveDbStock } from './utils/api';
+import { loadDbOrders, importDbOrders, clearDbOrders, loadDbStock, saveDbStock, loadImportHistory } from './utils/api';
 import {
   UploadCloud,
   CheckCircle2,
@@ -136,6 +136,38 @@ export default function App() {
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [selectedCompanyModal, setSelectedCompanyModal] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // Shared upload time comes from PostgreSQL history, so every computer sees
+  // the same timestamp. Refresh beside the shared orders.
+  useEffect(() => {
+    let active=true;
+    const refresh=()=>loadImportHistory().then(rows=>{
+      if(!active)return;
+      const latest=rows.filter((row:any)=>row.entityType==='orders').sort((a:any,b:any)=>new Date(b.importedAt).getTime()-new Date(a.importedAt).getTime())[0];
+      setLastUpdated(latest?.importedAt||null);
+    }).catch(()=>{});
+    refresh();const timer=window.setInterval(refresh,10000);
+    return()=>{active=false;window.clearInterval(timer)};
+  },[]);
+
+  // Global keyboard workflow. Native buttons, inputs, selects and dialogs
+  // already support Tab/Shift+Tab, Enter, Space and Escape.
+  useEffect(() => {
+    const tabs:DashboardViewTab[]=['orders','stock','deadline','reorder','areas','dispatch','report'];
+    const onKey=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null;
+      const editing=!!target&&['INPUT','TEXTAREA','SELECT'].includes(target.tagName);
+      if(event.key==='Escape'){
+        setIsExcelModalOpen(false);setIsClearConfirmOpen(false);setSelectedCompanyModal(null);setEditingOrder(null);return;
+      }
+      if(editing)return;
+      if(event.altKey&&event.key.toLowerCase()==='u'){event.preventDefault();setIsExcelModalOpen(true);return}
+      if(event.altKey&&/^[1-7]$/.test(event.key)){event.preventDefault();setActiveTab(tabs[Number(event.key)-1]);return}
+      if(event.key==='/'){event.preventDefault();setActiveTab('orders');window.setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0)}
+    };
+    window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
+  },[]);
 
   // PostgreSQL is the shared company dataset. Refresh it regularly so uploads and edits
   // made on one computer appear on the other open dashboards.
@@ -257,6 +289,7 @@ export default function App() {
         groupIndex++;
       }
       finalOrders = dbResult?.orders || finalOrders;
+      setLastUpdated(new Date().toISOString());
       updatedSourceName = `${source} → PostgreSQL`;
       setToastMessage(`PostgreSQL saved: ${inserted} new, ${updated} updated, ${finalOrders.length} total orders from ${groups.size} sheet(s).`);
     } catch {
@@ -634,6 +667,7 @@ export default function App() {
 
   return (
     <div id="orders-dashboard-root" className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans">
+      <a href="#main-dashboard-content" className="keyboard-skip-link">Skip to dashboard content</a>
       <UploadHistorySidebar />
       {/* Top Navbar */}
       <DashboardNavbar
@@ -642,10 +676,11 @@ export default function App() {
         onClearAllData={() => setIsClearConfirmOpen(true)}
         currentSource={sourceName}
         orderCount={orders.length}
+        lastUpdated={lastUpdated}
       />
 
       {/* Main Dashboard Canvas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
+      <main id="main-dashboard-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
         {/* Toast Alert */}
         {toastMessage && (
           <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-slate-100 rounded-xl shadow-lg border border-slate-700 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -745,7 +780,7 @@ export default function App() {
               ['dispatch', 'Dispatch'],
               ['report', 'Report'],
             ].map(([tab, label]) => (
-              <button key={tab} type="button" onClick={() => setActiveTab(tab as DashboardViewTab)} className={`flex-1 min-w-[150px] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${activeTab === tab ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <button key={tab} type="button" title={`Keyboard: Alt+${['orders','stock','deadline','reorder','areas','dispatch','report'].indexOf(tab)+1}`} onClick={() => setActiveTab(tab as DashboardViewTab)} className={`flex-1 min-w-[150px] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${activeTab === tab ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-50'}`}>
                 {label}
               </button>
             ))}

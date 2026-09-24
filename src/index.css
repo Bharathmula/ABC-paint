@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Strong, consistent keyboard focus across every interactive control. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #38bdf8 !important;
+  outline-offset: 2px;
+}
+
+.keyboard-skip-link {
+  position: fixed; left: 1rem; top: -4rem; z-index: 100;
+  background: #fff; color: #0f172a; padding: .65rem 1rem; border-radius: .5rem;
+  font-weight: 700; box-shadow: 0 8px 24px rgb(15 23 42 / .25);
+}
+.keyboard-skip-link:focus { top: 1rem; }
+
 /* Keep the dashboard fixed while a dialog/slide is open; only its own content scrolls. */
 body:has(.fixed.inset-0.z-50) { overflow: hidden; }
 
