@@ -148,6 +148,10 @@ app.post('/api/orders/import', async (req,res) => {
       const master=byParty.get(norm(o.companyName));
       if (master?.area_code) o.area=master.area_code;
       const key=dedupKey(o);
+      // A manual edit can add or change the OB/SK number, which changes the
+      // dedup key. Remove the previous row for the same dashboard order id so
+      // editing never leaves a duplicate or a visual gap in the order list.
+      if (o.id) await client.query(`DELETE FROM orders WHERE order_data->>'id'=$1 AND dedup_key<>$2`, [String(o.id), key]);
       const existed=(await client.query('SELECT 1 FROM orders WHERE dedup_key=$1',[key])).rowCount;
       await client.query(`INSERT INTO orders(dedup_key,voucher_number,company_name,area_code,order_data,source_file)
         VALUES($1,$2,$3,$4,$5::jsonb,$6)

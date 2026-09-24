@@ -19,6 +19,7 @@ import { AreasDashboard } from './components/AreasDashboard';
 import { DispatchPlanner } from './components/DispatchPlanner';
 import { DailyReport } from './components/DailyReport';
 import { UploadHistorySidebar } from './components/UploadHistorySidebar';
+import { OrderEditModal } from './components/OrderEditModal';
 import { applyOrderLifecycle } from './utils/orderStatus';
 import { syncOrderAreas, resolveAreaCode, loadAreas } from './utils/areaStore';
 import { loadDbOrders, importDbOrders, clearDbOrders, loadDbStock, saveDbStock } from './utils/api';
@@ -59,6 +60,7 @@ export default function App() {
   const sharedStockReady = useRef(false);
   // Active Tab View - defaults to Stock Records
   const [activeTab, setActiveTab] = useState<DashboardViewTab>('orders');
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // Orders are cached locally, but PostgreSQL is the primary persistent store when configured
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -592,6 +594,20 @@ export default function App() {
     setToastMessage(`${order.voucherNumber || order.id}: completion undone and order returned to active orders.`);
   };
 
+  const handleSaveEditedOrder = async (edited: Order) => {
+    const updated = applyOrderLifecycle({ ...edited, pending: Math.max(0, edited.orderQuantity - edited.issue) });
+    const nextOrders = orders.map(o => o.id === updated.id ? updated : o).map(applyOrderLifecycle);
+    setOrders(nextOrders);
+    setEditingOrder(null);
+    try {
+      const dbResult = await importDbOrders([updated], 'Manual order edit', 'merge');
+      if (dbResult?.orders?.length) setOrders(dbResult.orders.map(applyOrderLifecycle));
+      setToastMessage(`${updated.voucherNumber || updated.skNumber || updated.companyName} details saved permanently.`);
+    } catch {
+      setToastMessage('Order updated in this browser, but PostgreSQL could not be reached.');
+    }
+  };
+
   const handleExportExcel = () => {
     exportOrdersToExcel(filteredOrders, `ABC_Paints_Orders_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
     setToastMessage(`Exported ${filteredOrders.length} orders to Excel!`);
@@ -777,6 +793,7 @@ export default function App() {
               onCompleteOrder={handleCompleteOrder}
               onRecordDispatch={handleRecordDispatch}
               onUndoComplete={handleUndoComplete}
+              onEditOrder={setEditingOrder}
             />
           </div>
         )}
@@ -797,6 +814,8 @@ export default function App() {
         orders={orders}
         onClose={() => setSelectedCompanyModal(null)}
       />
+
+      <OrderEditModal order={editingOrder} onClose={() => setEditingOrder(null)} onSave={handleSaveEditedOrder} />
 
       {/* Modal 3: Clear Data Confirmation Modal */}
       <ClearDataConfirmModal

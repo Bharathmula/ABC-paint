@@ -62,7 +62,8 @@ export function formatExcelDate(raw: any): string {
 }
 
 function isMargSalesOrderReport(matrix:any[][]):boolean {
-  return matrix.some(row=>row.some(cell=>String(cell??'').toUpperCase().includes('SALES ORDER FROM')))
+  // MARG uses both "SALES ORDER FROM ... TO ..." and "SALES ORDER AS ON ...".
+  return matrix.some(row=>row.some(cell=>String(cell??'').toUpperCase().includes('SALES ORDER')))
     && matrix.some(row=>String(row?.[0]??'').trim().toUpperCase()==='ORDER NO.');
 }
 
