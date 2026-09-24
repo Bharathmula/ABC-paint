@@ -31,6 +31,8 @@ export interface Order {
   rtg?: boolean;
   /** Excel/import file this order most recently came from. */
   sourceFile?: string;
+  /** Worksheet/tab inside the uploaded workbook that supplied this order. */
+  sourceSheet?: string;
   /** Previous quantities saved when a user action finishes an order, enabling one-click Undo. */
   completionUndo?: { issue: number; pending: number; status?: 'Completed' | 'Partial' | 'Pending' | 'Overdue'; items: OrderItem[]; skNumber?: string; rtg?: boolean };
 }

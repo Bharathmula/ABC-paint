@@ -237,10 +237,28 @@ export default function App() {
     }
 
     try {
-      const dbResult = await importDbOrders(newOrders, source, mode);
-      finalOrders = dbResult.orders;
+      // Store each worksheet as its own history entry while keeping one shared dataset.
+      // The first worksheet honors Replace; following worksheets merge into that result.
+      const groups = new Map<string, Order[]>();
+      newOrders.forEach(order => {
+        const sheet = (order.sourceSheet || 'Sheet 1').trim();
+        groups.set(sheet, [...(groups.get(sheet) || []), order]);
+      });
+      let dbResult:any = null;
+      let groupIndex = 0;
+      let inserted = 0;
+      let updated = 0;
+      for (const [sheetName, sheetOrders] of groups) {
+        const historyName = `${source} — ${sheetName}`;
+        sheetOrders.forEach(order => { order.sourceFile = historyName; });
+        dbResult = await importDbOrders(sheetOrders, historyName, groupIndex === 0 ? mode : 'merge');
+        inserted += dbResult.inserted || 0;
+        updated += dbResult.updated || 0;
+        groupIndex++;
+      }
+      finalOrders = dbResult?.orders || finalOrders;
       updatedSourceName = `${source} → PostgreSQL`;
-      setToastMessage(`PostgreSQL saved: ${dbResult.inserted} new, ${dbResult.updated} updated, ${dbResult.total} total orders.`);
+      setToastMessage(`PostgreSQL saved: ${inserted} new, ${updated} updated, ${finalOrders.length} total orders from ${groups.size} sheet(s).`);
     } catch {
       setToastMessage('PostgreSQL is not configured yet. Data is kept in this browser until DATABASE_URL is added.');
     }

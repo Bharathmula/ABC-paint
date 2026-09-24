@@ -255,27 +255,43 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
       return { orders: [], sheetNames: [], totalRows: 0, internalDuplicatesCount: 0, duplicateVouchers: [], error: 'The Excel workbook has no sheets.' };
     }
 
-    const firstSheet = workbook.Sheets[sheetNames[0]];
-
-    // MARG ERP pending-order exports are report-style sheets: company names are section
-    // headings and item rows sit underneath them. They are not ordinary header-row tables.
-    const matrix = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: '', raw: false });
-    if (isMargSalesBillReport(matrix)) {
-      return parseMargSalesOrderReport(matrix, sheetNames, true);
-    }
-    if (isMargSalesOrderReport(matrix)) {
-      return parseMargSalesOrderReport(matrix, sheetNames);
-    }
-    if (isMargPendingOrderReport(matrix)) {
-      return parseMargPendingOrderReport(matrix, sheetNames);
-    }
-
     const headerNames=new Set(['companyname','company','partyname','party','customer','client','vouchernumber','voucherno','orderno','date','orderdate','itemname','item']);
-    const headerRow=matrix.findIndex(row=>row.filter(cell=>headerNames.has(cleanHeader(String(cell??'')))).length>=2);
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '', range:headerRow>=0?headerRow:0 });
+    const reportOrders:Order[]=[];
+    const rawRows:Array<Record<string,any>>=[];
+    let scannedRows=0;
+    for(const sheetName of sheetNames){
+      const sheet=workbook.Sheets[sheetName];
+      const matrix=XLSX.utils.sheet_to_json<any[]>(sheet,{header:1,defval:'',raw:false});
+      scannedRows+=matrix.length;
+      let report:ParseExcelResult|undefined;
+      if(isMargSalesBillReport(matrix)) report=parseMargSalesOrderReport(matrix,[sheetName],true);
+      else if(isMargSalesOrderReport(matrix)) report=parseMargSalesOrderReport(matrix,[sheetName]);
+      else if(isMargPendingOrderReport(matrix)) report=parseMargPendingOrderReport(matrix,[sheetName]);
+      if(report){
+        reportOrders.push(...report.orders.map(order=>({...order,sourceSheet:sheetName,id:`${order.id}-${cleanHeader(sheetName)}`})));
+        continue;
+      }
+      // Search the first 100 rows because many accounting exports include titles,
+      // company information and blank lines before the actual table header.
+      let headerRow=matrix.slice(0,100).findIndex(row=>row.filter(cell=>headerNames.has(cleanHeader(String(cell??'')))).length>=2);
+      if(headerRow<0){
+        // Flexible fallback: accept a row containing any party/order identifier plus
+        // a quantity, amount, item or date field.
+        headerRow=matrix.slice(0,100).findIndex(row=>{
+          const h=row.map(cell=>cleanHeader(String(cell??'')));
+          const identity=h.some(v=>['companyname','company','partyname','party','customer','client','vouchernumber','voucherno','orderno','billno','sknumber','skno'].includes(v));
+          const detail=h.some(v=>['quantity','qty','orderquantity','amount','value','item','itemname','date','orderdate'].includes(v));
+          return identity&&detail;
+        });
+      }
+      if(headerRow>=0){
+        const rows=XLSX.utils.sheet_to_json<Record<string,any>>(sheet,{defval:'',range:headerRow});
+        rawRows.push(...rows.map(row=>({...row,__sheetName:sheetName})));
+      }
+    }
 
-    if (!rawRows || rawRows.length === 0) {
-      return { orders: [], sheetNames, totalRows: 0, internalDuplicatesCount: 0, duplicateVouchers: [], error: 'The active sheet contains no rows or data.' };
+    if (rawRows.length === 0 && reportOrders.length === 0) {
+      return { orders: [], sheetNames, totalRows: scannedRows, internalDuplicatesCount: 0, duplicateVouchers: [], error: `No order table was recognized in: ${sheetNames.join(', ')}. Add a company/party or OB/SK column with quantity, item, amount or date.` };
     }
 
     const rawParsedOrders: Order[] = [];
@@ -398,7 +414,7 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
       }
 
       rawParsedOrders.push({
-        id: `ord-uploaded-${index + 1}`,
+        id: `ord-uploaded-${cleanHeader(String(row.__sheetName||'sheet'))}-${index + 1}`,
         companyName,
         voucherNumber,
         skNumber,
@@ -414,8 +430,11 @@ export function parseExcelFile(fileData: ArrayBuffer): ParseExcelResult {
         salesPerson,
         status,
         items,
+        sourceSheet: String(row.__sheetName || sheetNames[0]),
       });
     });
+
+    rawParsedOrders.push(...reportOrders);
 
     // Remove internal duplicates from the same uploaded file
     const uniqueOrdersMap = new Map<string, Order>();
