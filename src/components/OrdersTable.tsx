@@ -26,7 +26,7 @@ export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilte
   const [open,setOpen]=useState<string|null>(null);
   const [sk,setSk]=useState<Record<string,string>>({});
   useEffect(()=>{if(keyboardOpenOrderId){setView('all');setOpen(keyboardOpenOrderId);window.setTimeout(()=>document.getElementById(`order-tile-${keyboardOpenOrderId}`)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}},[keyboardOpenOrderId]);
-  useEffect(()=>{const close=()=>setOpen(null);window.addEventListener('dashboard-close-overlays',close);return()=>window.removeEventListener('dashboard-close-overlays',close)},[]);
+  useEffect(()=>{const close=()=>{setOpen(null);setView('all')};window.addEventListener('dashboard-close-overlays',close);return()=>window.removeEventListener('dashboard-close-overlays',close)},[]);
   const metrics=useMemo(()=>calculateOrderMetrics(orders),[orders]);
   const shown=useMemo(()=>orders.filter(o=>{
     if(view==='today')return isOrderToday(o.date);

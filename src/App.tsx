@@ -162,8 +162,11 @@ export default function App() {
       if(event.key==='Escape'){
         event.preventDefault();event.stopPropagation();
         setIsExcelModalOpen(false);setIsClearConfirmOpen(false);setSelectedCompanyModal(null);setEditingOrder(null);setKeyboardHelpOpen(false);
+        setActiveTab('orders');setKeyboardOpenOrderId(null);
+        setActiveFilters(prev=>({...prev,areas:[],areaClasses:[],parties:[],deadlineRanges:[],salesPersons:[],items:[],searchQuery:''}));
         window.dispatchEvent(new Event('dashboard-close-overlays'));
-        if(target instanceof HTMLInputElement&&target.id==='search-orders-input'){setActiveFilters(prev=>({...prev,searchQuery:''}));target.blur()}
+        if(target instanceof HTMLElement)target.blur();
+        window.setTimeout(()=>{document.getElementById('main-dashboard-content')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'})},0);
         return;
       }
       if(editing)return;
@@ -687,7 +690,7 @@ export default function App() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{[
             ['O','Orders','orders'],['S','Stock','stock'],['D','Deadline / Dispatch','deadline'],['R','Reorder / Report','reorder'],['A','Areas','areas'],['P','Dispatch','dispatch'],['E','Report','report']
           ].map(([key,label,tab])=><button key={key} onClick={()=>{setActiveTab(tab as DashboardViewTab);setKeyboardHelpOpen(false)}} className="text-left border rounded-xl p-3 hover:bg-sky-50 hover:border-sky-400"><kbd className="inline-block bg-slate-900 text-white rounded px-2 py-1 mr-2 font-bold">{key}</kbd><b className="text-sm">{label}</b></button>)}</div>
-          <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm"><button onClick={()=>{setKeyboardHelpOpen(false);window.dispatchEvent(new Event('dashboard-toggle-history'))}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">H</kbd>History</button><button onClick={()=>{setKeyboardHelpOpen(false);setActiveTab('orders');setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0)}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">F</kbd>Search, then Enter to open first result</button><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Tab</kbd>Move to next button or field</div><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Esc</kbd>Close any open panel</div></div>
+          <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm"><button onClick={()=>{setKeyboardHelpOpen(false);window.dispatchEvent(new Event('dashboard-toggle-history'))}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">H</kbd>History</button><button onClick={()=>{setKeyboardHelpOpen(false);setActiveTab('orders');setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0)}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">F</kbd>Search, then Enter to open first result</button><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Tab</kbd>Move to next button or field</div><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Esc</kbd>Return completely to main Orders dashboard</div></div>
         </div>
       </div>}
       {/* Top Navbar */}
