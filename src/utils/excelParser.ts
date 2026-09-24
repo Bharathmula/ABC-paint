@@ -62,14 +62,19 @@ export function formatExcelDate(raw: any): string {
 }
 
 function isMargSalesOrderReport(matrix:any[][]):boolean {
-  // MARG uses both "SALES ORDER FROM ... TO ..." and "SALES ORDER AS ON ...".
-  return matrix.some(row=>row.some(cell=>String(cell??'').toUpperCase().includes('SALES ORDER')))
-    && matrix.some(row=>String(row?.[0]??'').trim().toUpperCase()==='ORDER NO.');
+  // Detect the columns rather than the report title: Marg installations and
+  // versions use different title text for the same exported layout.
+  return matrix.some(row=>{
+    const h=row.map(cell=>cleanHeader(String(cell??'')));
+    return h.includes('orderno')&&h.some(v=>['partyname','party','customername'].includes(v));
+  });
 }
 
 function isMargSalesBillReport(matrix:any[][]):boolean {
-  return matrix.some(row=>row.some(cell=>/\bSALE FROM\b/i.test(String(cell??''))))
-    && matrix.some(row=>cleanHeader(String(row?.[0]??''))==='billno');
+  return matrix.some(row=>{
+    const h=row.map(cell=>cleanHeader(String(cell??'')));
+    return h.includes('billno')&&h.some(v=>['partyname','party','customername'].includes(v));
+  });
 }
 
 function lastNumber(value:any):number {
@@ -136,10 +141,8 @@ function parseMargDate(raw: any, referenceDate?: string): string {
 
 function isMargPendingOrderReport(matrix: any[][]): boolean {
   return matrix.some((row) =>
-    row.some((cell) => String(cell ?? '').toUpperCase().includes('ALL PENDING ORDERS (SALES)'))
-  ) && matrix.some((row) =>
     row.some((cell) => cleanHeader(String(cell ?? '')) === 'itemname') &&
-    row.some((cell) => cleanHeader(String(cell ?? '')) === 'entryno')
+    row.some((cell) => ['entryno','orderno','voucherno'].includes(cleanHeader(String(cell ?? ''))))
   );
 }
 
