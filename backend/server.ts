@@ -187,9 +187,33 @@ app.get('/api/stock', async (_req,res) => {
 
 app.put('/api/stock', async (req,res) => {
   if (!pool) return res.status(503).json({error:'DATABASE_URL is not configured'});
-  const records=Array.isArray(req.body?.records)?req.body.records:[];const client=await pool.connect();
-  try{await client.query('BEGIN');await client.query('DELETE FROM stock_records');for(const record of records){await client.query('INSERT INTO stock_records(id,stock_data) VALUES($1,$2::jsonb)',[String(record.id),JSON.stringify(record)])}await client.query('COMMIT')}catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
-  res.json({ok:true,total:records.length});
+  const received=Array.isArray(req.body?.records)?req.body.records:[];
+  // Browser synchronization can submit the same generated stock ID twice, and
+  // multiple open computers can save at the same moment. Keep the latest copy
+  // of each ID and serialize full-table replacements to protect the primary key.
+  const unique=new Map<string,any>();
+  for(const record of received){
+    const id=String(record?.id||'').trim();
+    if(id)unique.set(id,{...record,id});
+  }
+  const records=[...unique.values()];
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('abc_paints_stock_replace'))");
+    await client.query('DELETE FROM stock_records');
+    for(const record of records){
+      await client.query(`INSERT INTO stock_records(id,stock_data) VALUES($1,$2::jsonb)
+        ON CONFLICT(id) DO UPDATE SET stock_data=EXCLUDED.stock_data,updated_at=now()`,
+        [record.id,JSON.stringify(record)]);
+    }
+    await client.query('COMMIT');
+    res.json({ok:true,total:records.length,received:received.length,duplicatesRemoved:received.length-records.length});
+  }catch(error){
+    await client.query('ROLLBACK');
+    console.error('Stock save failed',error);
+    res.status(500).json({error:'Stock records could not be saved'});
+  }finally{client.release()}
 });
 
 await initDb();
