@@ -9,6 +9,7 @@ export function UploadHistorySidebar(){
  const [selected,setSelected]=useState<string[]>([]); const [message,setMessage]=useState('');
  const [column,setColumn]=useState<'added'|'activity'>('added');
  useEffect(()=>{if(open)loadImportHistory().then(history=>setRows(history.filter((row:HistoryRow)=>row.entityType==='orders'))).catch(()=>setRows([]))},[open]);
+ useEffect(()=>{document.documentElement.classList.toggle('dashboard-panel-open',open);document.body.classList.toggle('dashboard-panel-open',open);return()=>{document.documentElement.classList.remove('dashboard-panel-open');document.body.classList.remove('dashboard-panel-open')}},[open]);
  useEffect(()=>{const toggleHistory=()=>setOpen(v=>!v);const closeHistory=()=>setOpen(false);window.addEventListener('dashboard-toggle-history',toggleHistory);window.addEventListener('dashboard-close-overlays',closeHistory);return()=>{window.removeEventListener('dashboard-toggle-history',toggleHistory);window.removeEventListener('dashboard-close-overlays',closeHistory)}},[]);
  const addedReports=rows.filter(r=>!/(existing browser data migration|migration|legacy data)/i.test(r.sourceFile));
  const displayedRows=column==='added'?addedReports:rows;
@@ -20,7 +21,7 @@ export function UploadHistorySidebar(){
  };
  return <>
   <button type="button" onClick={()=>setOpen(v=>!v)} className="fixed left-0 top-24 z-50 bg-slate-900 text-white rounded-r-xl px-2 py-4 shadow-lg flex flex-col items-center gap-1" title={open?'Close Excel reports':'Open Excel reports added'}><History className="w-4 h-4"/><span className="text-[10px] [writing-mode:vertical-rl]">History</span>{open?<ChevronLeft className="w-3 h-3"/>:<ChevronRight className="w-3 h-3"/>}</button>
-  <aside className={`fixed left-0 top-0 bottom-0 z-40 w-96 max-w-[92vw] bg-white border-r shadow-2xl transition-transform duration-200 ${open?'translate-x-0':'-translate-x-full'}`}>
+  <aside className={`dashboard-scroll-lock fixed left-0 top-0 bottom-0 z-40 w-96 max-w-[92vw] bg-white border-r shadow-2xl transition-transform duration-200 ${open?'translate-x-0':'-translate-x-full'}`}>
    <div className="h-full flex flex-col pt-20">
     <div className="px-5 pb-4 border-b"><h2 className="font-bold text-lg flex items-center gap-2"><History className="w-6 h-6"/>Excel History</h2><p className="text-xs text-slate-500 mt-1">Uploaded reports and database activity.</p></div>
     <div className="grid grid-cols-2 gap-2 p-3 border-b bg-white">
