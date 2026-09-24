@@ -38,7 +38,7 @@ export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilte
   }).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(a.voucherNumber).localeCompare(String(b.voucherNumber))),[orders,view]);
   const counts={
     rtg:orders.filter(o=>o.rtg&&isOrderUnfinished(o)).length,
-    overdue:orders.filter(isOverdueAfterThreeDays).length,
+    overdue:orders.filter(order=>isOverdueAfterThreeDays(order)).length,
     unfinished:orders.filter(o=>isOrderUnfinished(o)&&!o.rtg).length
   };
   const tabs:Array<[View,string,number,React.ReactNode,string]>=[

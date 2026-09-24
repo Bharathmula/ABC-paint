@@ -9,11 +9,18 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '15mb' }));
+const allowedOrigins=(process.env.CORS_ALLOWED_ORIGINS||
+  'https://abc-paint-qpkv6bnkwftnqbuvq4n8qw.streamlit.app,https://abc-paints-dashboard.onrender.com,http://localhost:3000')
+  .split(',').map(value=>value.trim()).filter(Boolean);
 app.use((req,res,next)=>{
-  res.setHeader('Access-Control-Allow-Origin','*');
+  const origin=req.headers.origin;
+  if(origin&&allowedOrigins.includes(origin)){
+    res.setHeader('Access-Control-Allow-Origin',origin);
+    res.setHeader('Vary','Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
-  if(req.method==='OPTIONS') return res.sendStatus(204);
+  if(req.method==='OPTIONS') return !origin||allowedOrigins.includes(origin)?res.sendStatus(204):res.sendStatus(403);
   next();
 });
 
@@ -57,7 +64,7 @@ async function initDb() {
     ALTER TABLE customer_master ADD COLUMN IF NOT EXISTS classification TEXT;
     ALTER TABLE import_history ADD COLUMN IF NOT EXISTS entity_type TEXT NOT NULL DEFAULT 'orders';
   `);
-  const masterPath = path.join(__dirname, 'src/data/customerMaster.json');
+  const masterPath = path.join(__dirname, '..', 'frontend', 'src', 'data', 'customerMaster.json');
   const rows = JSON.parse(fs.readFileSync(masterPath, 'utf8')) as Array<{code:string;partyName:string;areaCode:string}>;
   const client = await pool.connect();
   try {
@@ -186,6 +193,11 @@ app.put('/api/stock', async (req,res) => {
 });
 
 await initDb();
-const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+const vite = await createViteServer({
+  root: path.join(__dirname, '..', 'frontend'),
+  configFile: path.join(__dirname, '..', 'frontend', 'vite.config.ts'),
+  server: { middlewareMode: true },
+  appType: 'spa'
+});
 app.use(vite.middlewares);
 app.listen(3000,'0.0.0.0',()=>console.log('Paint Dashboard: http://localhost:3000'));
