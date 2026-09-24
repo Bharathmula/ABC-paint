@@ -24,6 +24,7 @@ interface CategoryFilterBarProps {
   onRemoveFilter: (category: FilterCategory, value: string) => void;
   onResetAllFilters: () => void;
   onSearchChange: (query: string) => void;
+  onSearchEnter?: () => void;
   onSelectCompany?: (companyName: string) => void;
 }
 
@@ -37,6 +38,7 @@ export const CategoryFilterBar: React.FC<CategoryFilterBarProps> = ({
   onRemoveFilter,
   onResetAllFilters,
   onSearchChange,
+  onSearchEnter,
   onSelectCompany,
 }) => {
   const [openCategory, setOpenCategory] = useState<FilterCategory | null>(null);
@@ -211,9 +213,11 @@ export const CategoryFilterBar: React.FC<CategoryFilterBarProps> = ({
             type="text"
             value={activeFilters.searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search company, voucher #, PO..."
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onSearchEnter?.(); } }}
+            placeholder="Search company, voucher, OB, SK... (F)"
             className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 placeholder:text-slate-400"
           />
+          <button type="button" onClick={() => document.getElementById('search-orders-input')?.focus()} className="sr-only">Focus search</button>
           {activeFilters.searchQuery && (
             <button
               onClick={() => onSearchChange('')}

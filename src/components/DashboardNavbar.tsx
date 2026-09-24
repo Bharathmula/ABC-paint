@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileSpreadsheet, UploadCloud, Download, Trash2, Clock3 } from 'lucide-react';
+import { FileSpreadsheet, UploadCloud, Download, Trash2, Clock3, Keyboard } from 'lucide-react';
 import { downloadOrdersImportTemplate } from '../utils/excelParser';
 
 interface DashboardNavbarProps {
@@ -9,6 +9,7 @@ interface DashboardNavbarProps {
   currentSource: string;
   orderCount: number;
   lastUpdated?: string | null;
+  onOpenKeyboardHelp: () => void;
 }
 
 export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
@@ -18,6 +19,7 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
   currentSource,
   orderCount,
   lastUpdated,
+  onOpenKeyboardHelp,
 }) => {
   return (
     <header id="dashboard-navbar" className="bg-slate-900 text-slate-100 border-b border-slate-800 shadow-xs sticky top-0 z-30">
@@ -71,6 +73,9 @@ export const DashboardNavbar: React.FC<DashboardNavbarProps> = ({
             <Clock3 className="w-3.5 h-3.5" />
             <span>Last data upload: <strong className="text-white">{lastUpdated ? new Date(lastUpdated).toLocaleString('en-IN') : 'No upload recorded'}</strong></span>
           </div>
+          <button type="button" onClick={onOpenKeyboardHelp} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-sky-100 bg-sky-700 hover:bg-sky-600 rounded-xl border border-sky-500" title="Show keyboard controls">
+            <Keyboard className="w-4 h-4" /> Keyboard
+          </button>
           {/* Download Template button */}
           <button
             type="button"

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock, Layers, Package, Pencil, RotateCcw, Sparkles } from 'lucide-react';
 import { Order } from '../types';
 import { calculateOrderMetrics, isOrderToday, isOrderUnfinished, isOverdueAfterThreeDays } from '../utils/orderStatus';
@@ -11,6 +11,7 @@ interface Props {
   onRecordDispatch?: (order: Order, skNumber: string) => void;
   onUndoComplete?: (order: Order) => void;
   onEditOrder?: (order: Order) => void;
+  keyboardOpenOrderId?: string | null;
 }
 type View = 'all'|'today'|'rtg'|'overdue'|'unfinished'|'finished';
 
@@ -20,10 +21,12 @@ const appearance = (o:Order) => !isOrderUnfinished(o)
   ? {label:'RTG',head:'bg-cyan-700',body:'bg-cyan-50',border:'border-cyan-500'}
   : {label:'UNFINISHED',head:'bg-amber-500',body:'bg-amber-50',border:'border-amber-400'};
 
-export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilters,onCompleteOrder,onRecordDispatch,onUndoComplete,onEditOrder}) => {
+export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilters,onCompleteOrder,onRecordDispatch,onUndoComplete,onEditOrder,keyboardOpenOrderId}) => {
   const [view,setView]=useState<View>('all');
   const [open,setOpen]=useState<string|null>(null);
   const [sk,setSk]=useState<Record<string,string>>({});
+  useEffect(()=>{if(keyboardOpenOrderId){setView('all');setOpen(keyboardOpenOrderId);window.setTimeout(()=>document.getElementById(`order-tile-${keyboardOpenOrderId}`)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}},[keyboardOpenOrderId]);
+  useEffect(()=>{const close=()=>setOpen(null);window.addEventListener('dashboard-close-overlays',close);return()=>window.removeEventListener('dashboard-close-overlays',close)},[]);
   const metrics=useMemo(()=>calculateOrderMetrics(orders),[orders]);
   const shown=useMemo(()=>orders.filter(o=>{
     if(view==='today')return isOrderToday(o.date);
@@ -63,7 +66,7 @@ export const OrdersTable:React.FC<Props> = ({orders,onSelectCompany,onClearFilte
           const a=appearance(o), expanded=open===o.id, unfinished=isOrderUnfinished(o);
           const entered=(sk[o.id]??o.skNumber??'').trim();
           const displayNumber=o.skNumber||o.voucherNumber||'NO NUMBER';
-          return <article key={o.id} className={`relative border ${a.border} ${a.body} shadow-sm overflow-hidden ${expanded?'col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-6 xl:col-span-8 2xl:col-span-10':''}`}>
+          return <article id={`order-tile-${o.id}`} key={o.id} className={`relative border ${a.border} ${a.body} shadow-sm overflow-hidden ${expanded?'col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-6 xl:col-span-8 2xl:col-span-10':''}`}>
             <button onClick={()=>setOpen(expanded?null:o.id)} className="w-full text-left">
               <div className={`${a.head} text-white px-2 py-1 flex justify-between items-center gap-1`}>
                 <b className="font-mono text-[11px] truncate">{displayNumber}</b>

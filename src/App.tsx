@@ -137,6 +137,8 @@ export default function App() {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [selectedCompanyModal, setSelectedCompanyModal] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
+  const [keyboardOpenOrderId, setKeyboardOpenOrderId] = useState<string | null>(null);
 
   // Shared upload time comes from PostgreSQL history, so every computer sees
   // the same timestamp. Refresh beside the shared orders.
@@ -151,22 +153,32 @@ export default function App() {
     return()=>{active=false;window.clearInterval(timer)};
   },[]);
 
-  // Global keyboard workflow. Native buttons, inputs, selects and dialogs
-  // already support Tab/Shift+Tab, Enter, Space and Escape.
+  // Global keyboard workflow. Letter shortcuts are disabled while typing.
   useEffect(() => {
     const tabs:DashboardViewTab[]=['orders','stock','deadline','reorder','areas','dispatch','report'];
     const onKey=(event:KeyboardEvent)=>{
       const target=event.target as HTMLElement|null;
       const editing=!!target&&['INPUT','TEXTAREA','SELECT'].includes(target.tagName);
       if(event.key==='Escape'){
-        setIsExcelModalOpen(false);setIsClearConfirmOpen(false);setSelectedCompanyModal(null);setEditingOrder(null);return;
+        event.preventDefault();event.stopPropagation();
+        setIsExcelModalOpen(false);setIsClearConfirmOpen(false);setSelectedCompanyModal(null);setEditingOrder(null);setKeyboardHelpOpen(false);
+        window.dispatchEvent(new Event('dashboard-close-overlays'));
+        if(target instanceof HTMLInputElement&&target.id==='search-orders-input'){setActiveFilters(prev=>({...prev,searchQuery:''}));target.blur()}
+        return;
       }
       if(editing)return;
       if(event.altKey&&event.key.toLowerCase()==='u'){event.preventDefault();setIsExcelModalOpen(true);return}
       if(event.altKey&&/^[1-7]$/.test(event.key)){event.preventDefault();setActiveTab(tabs[Number(event.key)-1]);return}
-      if(event.key==='/'){event.preventDefault();setActiveTab('orders');window.setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0)}
+      const key=event.key.toLowerCase();
+      if(key==='/'||key==='f'){event.preventDefault();setActiveTab('orders');window.setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0);return}
+      if(key==='h'){event.preventDefault();window.dispatchEvent(new Event('dashboard-toggle-history'));return}
+      if(key==='k'){event.preventDefault();setKeyboardHelpOpen(v=>!v);return}
+      const direct:Partial<Record<string,DashboardViewTab>>={o:'orders',s:'stock',a:'areas',p:'dispatch',e:'report'};
+      if(direct[key]){event.preventDefault();setActiveTab(direct[key]!);return}
+      if(key==='d'){event.preventDefault();setActiveTab(current=>current==='deadline'?'dispatch':'deadline');return}
+      if(key==='r'){event.preventDefault();setActiveTab(current=>current==='reorder'?'report':'reorder')}
     };
-    window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
+    window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true);
   },[]);
 
   // PostgreSQL is the shared company dataset. Refresh it regularly so uploads and edits
@@ -669,6 +681,15 @@ export default function App() {
     <div id="orders-dashboard-root" className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans">
       <a href="#main-dashboard-content" className="keyboard-skip-link">Skip to dashboard content</a>
       <UploadHistorySidebar />
+      {keyboardHelpOpen&&<div className="fixed inset-0 z-[80] bg-slate-950/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onMouseDown={()=>setKeyboardHelpOpen(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-2xl p-5" onMouseDown={e=>e.stopPropagation()}>
+          <div className="flex justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Keyboard Controls</h2><p className="text-sm text-slate-500">Press a key anywhere outside a text field.</p></div><button autoFocus onClick={()=>setKeyboardHelpOpen(false)} className="border rounded-lg px-3 py-2 font-bold">Esc / Close</button></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{[
+            ['O','Orders','orders'],['S','Stock','stock'],['D','Deadline / Dispatch','deadline'],['R','Reorder / Report','reorder'],['A','Areas','areas'],['P','Dispatch','dispatch'],['E','Report','report']
+          ].map(([key,label,tab])=><button key={key} onClick={()=>{setActiveTab(tab as DashboardViewTab);setKeyboardHelpOpen(false)}} className="text-left border rounded-xl p-3 hover:bg-sky-50 hover:border-sky-400"><kbd className="inline-block bg-slate-900 text-white rounded px-2 py-1 mr-2 font-bold">{key}</kbd><b className="text-sm">{label}</b></button>)}</div>
+          <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm"><button onClick={()=>{setKeyboardHelpOpen(false);window.dispatchEvent(new Event('dashboard-toggle-history'))}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">H</kbd>History</button><button onClick={()=>{setKeyboardHelpOpen(false);setActiveTab('orders');setTimeout(()=>document.getElementById('search-orders-input')?.focus(),0)}} className="border rounded-xl p-3 text-left"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">F</kbd>Search, then Enter to open first result</button><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Tab</kbd>Move to next button or field</div><div className="border rounded-xl p-3"><kbd className="bg-slate-900 text-white rounded px-2 py-1 mr-2">Esc</kbd>Close any open panel</div></div>
+        </div>
+      </div>}
       {/* Top Navbar */}
       <DashboardNavbar
         onOpenExcelLoader={() => setIsExcelModalOpen(true)}
@@ -677,6 +698,7 @@ export default function App() {
         currentSource={sourceName}
         orderCount={orders.length}
         lastUpdated={lastUpdated}
+        onOpenKeyboardHelp={() => setKeyboardHelpOpen(true)}
       />
 
       {/* Main Dashboard Canvas */}
@@ -836,6 +858,7 @@ export default function App() {
               onRemoveFilter={handleRemoveFilter}
               onResetAllFilters={handleResetAllFilters}
               onSearchChange={(q) => setActiveFilters((prev) => ({ ...prev, searchQuery: q }))}
+              onSearchEnter={() => { const first=filteredOrders[0]; if(first){setKeyboardOpenOrderId(null);window.setTimeout(()=>setKeyboardOpenOrderId(first.id),0)} }}
               onSelectCompany={(company) => setSelectedCompanyModal(company)}
             />
 
@@ -848,6 +871,7 @@ export default function App() {
               onRecordDispatch={handleRecordDispatch}
               onUndoComplete={handleUndoComplete}
               onEditOrder={setEditingOrder}
+              keyboardOpenOrderId={keyboardOpenOrderId}
             />
           </div>
         )}

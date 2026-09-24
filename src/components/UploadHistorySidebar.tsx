@@ -8,6 +8,7 @@ export function UploadHistorySidebar(){
  const [open,setOpen]=useState(false); const [rows,setRows]=useState<HistoryRow[]>([]);
  const [selected,setSelected]=useState<string[]>([]); const [message,setMessage]=useState('');
  useEffect(()=>{if(open)loadImportHistory().then(history=>setRows(history.filter((row:HistoryRow)=>row.entityType==='orders'))).catch(()=>setRows([]))},[open]);
+ useEffect(()=>{const toggleHistory=()=>setOpen(v=>!v);const closeHistory=()=>setOpen(false);window.addEventListener('dashboard-toggle-history',toggleHistory);window.addEventListener('dashboard-close-overlays',closeHistory);return()=>{window.removeEventListener('dashboard-toggle-history',toggleHistory);window.removeEventListener('dashboard-close-overlays',closeHistory)}},[]);
  const allSelected=rows.length>0&&selected.length===rows.length;
  const toggle=(id:string|number)=>setSelected(s=>s.includes(String(id))?s.filter(x=>x!==String(id)):[...s,String(id)]);
  const removeSelected=async()=>{
