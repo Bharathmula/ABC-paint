@@ -2,12 +2,16 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import * as XLSX from 'xlsx';
 import {Search,MapPin,Plus,Trash2,UploadCloud,Download} from 'lucide-react';
 import {Order} from '../types';
-import {AreaEntry,AreaClass,loadAreas,saveAreas} from '../utils/areaStore';
+import {AreaEntry,AreaClass,defaultAreas,loadAreas,saveAreas} from '../utils/areaStore';
 import {loadDbAreas,saveDbAreas} from '../utils/api';
 import {isOrderToday,isOrderUnfinished} from '../utils/orderStatus';
 
 const clean=(v:any)=>String(v??'').trim();
 const header=(v:any)=>clean(v).toLowerCase().replace(/[^a-z]/g,'');
+const partyKey=(v:any)=>clean(v).toUpperCase().replace(/[^A-Z0-9]/g,'');
+const customerCode=(v:any)=>clean(v).match(/^([A-Z]{1,8}[A-Z0-9*]*\d[A-Z0-9*]*)\s+/i)?.[1]||'';
+const partyWithoutCode=(v:any)=>clean(v).replace(/^[A-Z]{1,8}[A-Z0-9*]*\d[A-Z0-9*]*\s+/i,'');
+const usableArea=(v:any)=>{const area=clean(v);return area&&!['NOT ASSIGNED','UNASSIGNED','GENERAL AREA','GENERAL','N/A','NA','-','—'].includes(area.toUpperCase())?area:''};
 const SHARED_AREA_MIGRATION_KEY='abc_shared_areas_migrated_v1';
 
 export function AreasDashboard({orders}:{orders:Order[]}){
@@ -40,12 +44,20 @@ export function AreasDashboard({orders}:{orders:Order[]}){
  const persist=async(next:AreaEntry[],source='Manual area update')=>{setAreas(next);saveAreas(next);try{await saveDbAreas(next,source);setMessage(`${message||'Areas updated'} Saved permanently in PostgreSQL.`)}catch{setMessage(`${message||'Areas updated'} Database unavailable; saved in this browser.`)}};
  const stats=useMemo(()=>{const m=new Map<string,{n:number;q:number}>();orders.filter(o=>o.pending>0).forEach(o=>{const k=o.companyName.trim().toUpperCase();const x=m.get(k)||{n:0,q:0};x.n++;x.q+=o.pending;m.set(k,x)});return m},[orders]);
  const priorityOrders=useMemo(()=>{
-  const areaByCompany=new Map(areas.map(a=>[clean(a.companyName).toUpperCase(),clean(a.areaCode)]));
+  // A valid area supplied by the order/Excel is authoritative. For older
+  // orders without an area, use the saved shared master and then the original
+  // bundled customer master. Normalized party keys handle punctuation/spaces.
+  const original=defaultAreas();
+  const originalAreaByCompany=new Map(original.map(a=>[partyKey(a.companyName),usableArea(a.areaCode)]));
+  const originalAreaByCode=new Map(original.map(a=>[partyKey(a.code||''),usableArea(a.areaCode)]));
+  const savedAreaByCompany=new Map(areas.map(a=>[partyKey(a.companyName),usableArea(a.areaCode)]));
+  const savedAreaByCode=new Map(areas.map(a=>[partyKey(a.code||''),usableArea(a.areaCode)]));
+  const masterArea=(companyName:string)=>savedAreaByCode.get(partyKey(customerCode(companyName)))||originalAreaByCode.get(partyKey(customerCode(companyName)))||savedAreaByCompany.get(partyKey(companyName))||originalAreaByCompany.get(partyKey(companyName))||savedAreaByCompany.get(partyKey(partyWithoutCode(companyName)))||originalAreaByCompany.get(partyKey(partyWithoutCode(companyName)))||'';
   return orders
    .filter(o=>isOrderToday(o.date)||!!o.rtg||isOrderUnfinished(o))
    .map(o=>({
     order:o,
-    area:clean(o.area)&&clean(o.area).toLowerCase()!=='not assigned'?clean(o.area):(areaByCompany.get(clean(o.companyName).toUpperCase())||'Not Assigned'),
+    area:usableArea(o.area)||masterArea(o.companyName)||'Not Assigned',
     today:isOrderToday(o.date),
     rtg:!!o.rtg&&isOrderUnfinished(o),
     unfinished:isOrderUnfinished(o)&&!o.rtg

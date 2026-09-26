@@ -3,8 +3,24 @@ import { Order, OrderItem } from '../types';
 import customerMaster from '../data/customerMaster.json';
 
 const normalizePartyName = (value: string) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-const AREA_BY_PARTY = new Map<string, string>((customerMaster as Array<{partyName:string; areaCode:string}>).map(c => [normalizePartyName(c.partyName), c.areaCode]));
-const getMasterAreaCode = (companyName: string) => AREA_BY_PARTY.get(normalizePartyName(companyName)) || '';
+const MASTER_CUSTOMERS=customerMaster as Array<{code:string;partyName:string;areaCode:string}>;
+const AREA_BY_PARTY = new Map<string, string>(MASTER_CUSTOMERS.map(c => [normalizePartyName(c.partyName), c.areaCode]));
+const AREA_BY_CODE = new Map<string, string>(MASTER_CUSTOMERS.map(c => [normalizePartyName(c.code), c.areaCode]));
+const getMasterAreaCode = (companyName: string) => {
+  const raw=String(companyName||'').trim();
+  const exact=AREA_BY_PARTY.get(normalizePartyName(raw));
+  if(exact)return exact;
+  // MARG often prefixes the party name with its customer code, for example
+  // "DH011 HOME NEEDS". Match that code against the original customer master.
+  const prefixed=raw.match(/^([A-Z]{1,8}[A-Z0-9*]*\d[A-Z0-9*]*)\s+(.+)$/i);
+  if(prefixed){
+    const byCode=AREA_BY_CODE.get(normalizePartyName(prefixed[1]));
+    if(byCode)return byCode;
+    const withoutCode=AREA_BY_PARTY.get(normalizePartyName(prefixed[2]));
+    if(withoutCode)return withoutCode;
+  }
+  return '';
+};
 
 // Normalize spreadsheet headers so imports work across spaces, punctuation and casing.
 // Example: "Order Quantity", "order_quantity" and "ORDER-QTY" can be matched reliably.

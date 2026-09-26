@@ -151,14 +151,22 @@ app.post('/api/orders/import', async (req,res) => {
   const {orders=[], sourceFile='Excel Upload', mode='merge'} = req.body || {};
   const masters=(await pool.query('SELECT code,party_name,area_code FROM customer_master')).rows;
   const byParty=new Map(masters.map((m:any)=>[norm(m.party_name),m]));
+  const byCode=new Map(masters.map((m:any)=>[norm(m.code),m]));
   const client=await pool.connect(); let inserted=0, updated=0;
   try {
     await client.query('BEGIN');
     if (mode==='replace') await client.query('DELETE FROM orders');
     for (const original of orders) {
       const o={...original};
-      const master=byParty.get(norm(o.companyName));
-      if (master?.area_code) o.area=master.area_code;
+      const companyName=String(o.companyName||'').trim();
+      const prefixed=companyName.match(/^([A-Z]{1,8}[A-Z0-9*]*\d[A-Z0-9*]*)\s+(.+)$/i);
+      const master=byParty.get(norm(companyName))||(prefixed?byCode.get(norm(prefixed[1]))||byParty.get(norm(prefixed[2])):undefined);
+      const suppliedArea=String(o.area||'').trim();
+      const hasUsableArea=suppliedArea&&!['NOT ASSIGNED','UNASSIGNED','GENERAL AREA','GENERAL','N/A','NA','-','—'].includes(suppliedArea.toUpperCase());
+      // Keep the area code supplied by the current/future Excel order. The
+      // original shared area master is the fallback for older orders whose
+      // source file does not contain an area code.
+      if (!hasUsableArea&&master?.area_code) o.area=master.area_code;
       const key=dedupKey(o);
       // A manual edit can add or change the OB/SK number, which changes the
       // dedup key. Remove the previous row for the same dashboard order id so
