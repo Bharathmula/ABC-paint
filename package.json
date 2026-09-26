@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx backend/server.ts",
     "start": "node build/server.js",
-    "build": "vite build --config frontend/vite.config.ts && tsc backend/server.ts --ignoreConfig --outDir build --module NodeNext --moduleResolution NodeNext --target ES2022 --esModuleInterop --skipLibCheck",
+    "build": "vite build --config frontend/vite.config.ts && tsc backend/server.ts --ignoreConfig --noCheck --outDir build --module NodeNext --moduleResolution NodeNext --target ES2022 --esModuleInterop --skipLibCheck",
     "preview": "vite preview --config frontend/vite.config.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
